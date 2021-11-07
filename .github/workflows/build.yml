@@ -1,0 +1,19 @@
+name: Build and Test
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: [macos-latest]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Download LLVM-PSTL unit tests
+      run: |
+        cd test-llvm-pstl && ./bootstrap.sh
+    - name: Build and run unit tests
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make pstld-build-llvm-tests
+        make test
