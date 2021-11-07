@@ -240,4 +240,66 @@ template <class FwdIt, class T, class BinOp, class UnOp>
     return std::transform_reduce(first, last, val, reduce_op, transform_op);
 }
 
+
+namespace internal {
+
+template <class It1, class It2, class T, class BinRedOp, class BinTrOp>
+struct TransformReduce2
+{
+    Partition<It1, is_random_iterator_v<It1> > m_partition1;
+    Partition<It2, is_random_iterator_v<It2> > m_partition2;
+    unitialized_array<T> m_results;
+    BinRedOp m_reduce;
+    BinTrOp m_transform;
+    
+    TransformReduce2(size_t _count, size_t _chunks, It1 _first1, It2 _first2, BinRedOp _reduce_op, BinTrOp _transform_op):
+        m_partition1(_first1, _count, _chunks),
+        m_partition2(_first2, _count, _chunks),
+        m_results(_chunks),
+        m_reduce(_reduce_op),
+        m_transform(_transform_op)
+    {
+    }
+    
+    void run(size_t _ind) noexcept
+    {
+        auto p1 = m_partition1.at(_ind);
+        auto p2 = m_partition2.at(_ind);
+        m_results.put(_ind, transform_reduce_at_least_2(p1.first, p1.last, p2.first));
+    }
+    
+    static void dispatch(void *_ctx, size_t _ind)
+    {
+        static_cast<TransformReduce2*>(_ctx)->run(_ind);
+    }
+    
+    T transform_reduce_at_least_2(It1 _first1, It1 _last1, It2 _first2) {
+        auto next1 = _first1;
+        auto next2 = _first2;
+        T val = m_reduce(m_transform(*_first1, *_first2), m_transform(*++next1, *++next2));
+        while (++next1 != _last1)
+            val = m_reduce(std::move(val), m_transform(*next1, *++next2));
+        return val;
+    }
+};
+
+}
+
+template <class FwdIt1, class FwdIt2, class T, class BinRedOp, class BinTrOp>
+[[nodiscard]] T transform_reduce(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinRedOp reduce_op, BinTrOp transform_op) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_2(count);
+    if( chunks > 1 ) {
+        try {
+            internal::TransformReduce2<FwdIt1, FwdIt2, T, BinRedOp, BinTrOp> op{ static_cast<size_t>(count), chunks, first1, first2, reduce_op, transform_op };
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
+        }
+        catch(const internal::parallelism_exception&){
+        }
+    }
+    return std::transform_reduce(first1, last1, first2, val, reduce_op, transform_op);
+}
+
 }

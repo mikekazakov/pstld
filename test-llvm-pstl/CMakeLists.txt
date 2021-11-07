@@ -9,6 +9,7 @@ add_custom_target(check-pstld-llvm
 
 set(UNIT_TESTS
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/reduce.pass.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/transform_reduce.pass.cpp
 )
 
 foreach(_file IN LISTS UNIT_TESTS)
