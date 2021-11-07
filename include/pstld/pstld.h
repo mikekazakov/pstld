@@ -16,21 +16,22 @@ template <class It>
 using iterator_category_t = typename std::iterator_traits<It>::iterator_category;
 
 template <class It>
-inline constexpr bool is_random_iterator_v = std::is_convertible_v<iterator_category_t<It>, std::random_access_iterator_tag>;
+inline constexpr bool is_random_iterator_v =
+    std::is_convertible_v<iterator_category_t<It>, std::random_access_iterator_tag>;
 
 template <class It>
 using iterator_value_t = typename std::iterator_traits<It>::value_type;
 
 struct no_op {
     template <typename T>
-    T&& operator()(T&& v) const
+    T &&operator()(T &&v) const
     {
         return std::forward<T>(v);
     }
 };
 
 struct parallelism_exception : std::exception {
-    const char* what() const noexcept override;
+    const char *what() const noexcept override;
     [[noreturn]] static void raise();
 };
 
@@ -39,25 +40,26 @@ struct parallelism_allocator {
     using value_type = T;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-    
-    T* allocate(size_t count) {
-        if (void* ptr = ::operator new(count * sizeof(T), std::nothrow))
-            return static_cast<T*>(ptr);
+
+    T *allocate(size_t count)
+    {
+        if( void *ptr = ::operator new(count * sizeof(T), std::nothrow) )
+            return static_cast<T *>(ptr);
         else
             parallelism_exception::raise();
     }
-    
-    void deallocate( T* ptr, size_t count ) noexcept {
-        ::operator delete (ptr, count * sizeof(T));
-    }
+
+    void deallocate(T *ptr, size_t count) noexcept { ::operator delete(ptr, count * sizeof(T)); }
 
     template <class Other>
-    bool operator==(const parallelism_allocator<Other>&) const noexcept {
+    bool operator==(const parallelism_allocator<Other> &) const noexcept
+    {
         return true;
     }
 
     template <class Other>
-    bool operator!=(const parallelism_allocator<Other>&) const noexcept {
+    bool operator!=(const parallelism_allocator<Other> &) const noexcept
+    {
         return false;
     }
 };
@@ -66,34 +68,27 @@ template <class T>
 using parallelism_vector = std::vector<T, parallelism_allocator<T>>;
 
 template <class T>
-struct unitialized_array : parallelism_allocator<T>
-{
+struct unitialized_array : parallelism_allocator<T> {
     using allocator = parallelism_allocator<T>;
     T *m_data;
     size_t m_size;
-    unitialized_array(size_t size):
-        m_size(size),
-        m_data( allocator::allocate(size) )
-    {}
-    
+    unitialized_array(size_t size) : m_size(size), m_data(allocator::allocate(size)) {}
+
     ~unitialized_array()
     {
-        std::destroy( m_data, m_data + m_size );
+        std::destroy(m_data, m_data + m_size);
         allocator::deallocate(m_data, m_size);
     }
-    
+
     template <class... Args>
-    void put(size_t ind, Args&&... vals) noexcept {
-        ::new (m_data + ind) T(std::forward<Args>(vals)...);
+    void put(size_t ind, Args &&...vals) noexcept
+    {
+        ::new(m_data + ind) T(std::forward<Args>(vals)...);
     }
-       
-    T *begin() noexcept {
-        return m_data;
-    }
-    
-    T *end() noexcept {
-        return m_data + m_size;
-    }
+
+    T *begin() noexcept { return m_data; }
+
+    T *end() noexcept { return m_data + m_size; }
 };
 
 inline constexpr size_t chunks_per_cpu = 8;
@@ -101,18 +96,17 @@ inline constexpr size_t chunks_per_cpu = 8;
 template <class T>
 constexpr size_t work_chunks_min_fraction_1(T count)
 {
-    return std::min( max_hw_threads() * chunks_per_cpu, static_cast<size_t>(count) );
+    return std::min(max_hw_threads() * chunks_per_cpu, static_cast<size_t>(count));
 }
 
 template <class T>
 constexpr size_t work_chunks_min_fraction_2(T count)
 {
-    return std::min( max_hw_threads() * chunks_per_cpu, static_cast<size_t>(count / 2) );
+    return std::min(max_hw_threads() * chunks_per_cpu, static_cast<size_t>(count / 2));
 }
 
 template <class It>
-struct ItRange
-{
+struct ItRange {
     It first;
     It last;
 };
@@ -121,50 +115,47 @@ template <class It, bool IsRandomAccess>
 struct Partition;
 
 template <class It>
-struct Partition<It, true>
-{
+struct Partition<It, true> {
     It base;
     size_t fraction;
     size_t leftover;
-    Partition(It _first, size_t _count, size_t _chunks):
-    base(_first),
-    fraction(_count / _chunks),
-    leftover(_count % _chunks)
-    {}
-    
+    Partition(It _first, size_t _count, size_t _chunks)
+        : base(_first), fraction(_count / _chunks), leftover(_count % _chunks)
+    {
+    }
+
     ItRange<It> at(size_t chunk_no)
     {
         if( leftover ) {
             if( chunk_no >= leftover ) {
-                const auto first = base + (fraction + 1) * leftover + fraction * (chunk_no - leftover);
+                const auto first =
+                    base + (fraction + 1) * leftover + fraction * (chunk_no - leftover);
                 const auto last = first + fraction;
-                return { first, last };
+                return {first, last};
             }
             else {
                 const auto first = base + (fraction + 1) * chunk_no;
                 const auto last = first + fraction + 1;
-                return { first, last };
+                return {first, last};
             }
         }
         else {
             const auto first = base + fraction * chunk_no;
             const auto last = first + fraction;
-            return { first, last };
+            return {first, last};
         }
     }
 };
 
 template <class It>
-struct Partition<It, false>
-{
+struct Partition<It, false> {
     parallelism_vector<ItRange<It>> segments;
-    Partition(It _first, size_t _count, size_t _chunks):
-    segments(_chunks)
+    Partition(It _first, size_t _count, size_t _chunks) : segments(_chunks)
     {
         size_t fraction = _count / _chunks;
         size_t leftover = _count % _chunks;
         It it = _first;
-        for(size_t i = 0; i != _chunks; ++i) {
+        for( size_t i = 0; i != _chunks; ++i ) {
             auto first = it;
             auto diff = fraction;
             if( leftover != 0 ) {
@@ -177,50 +168,48 @@ struct Partition<It, false>
         }
     }
 
-    ItRange<It> at(size_t chunk_no)
-    {
-        return segments[chunk_no];
-    }
+    ItRange<It> at(size_t chunk_no) { return segments[chunk_no]; }
 };
 
-}
+} // namespace internal
 
 namespace internal {
 
 template <class It, class T, class BinOp, class UnOp>
-struct TransformReduce
-{
-    Partition<It, is_random_iterator_v<It> > m_partition;
+struct TransformReduce {
+    Partition<It, is_random_iterator_v<It>> m_partition;
     unitialized_array<T> m_results;
     BinOp m_reduce;
     UnOp m_transform;
-    
-    TransformReduce(size_t _count, size_t _chunks, It _first, BinOp _reduce_op, UnOp _transform_op):
-        m_partition(_first, _count, _chunks),
-        m_results(_chunks),
-        m_reduce(_reduce_op),
-        m_transform(_transform_op)
-    {}
-    
-    void run(size_t _ind) noexcept {
+
+    TransformReduce(size_t _count, size_t _chunks, It _first, BinOp _reduce_op, UnOp _transform_op)
+        : m_partition(_first, _count, _chunks), m_results(_chunks), m_reduce(_reduce_op),
+          m_transform(_transform_op)
+    {
+    }
+
+    void run(size_t _ind) noexcept
+    {
         auto p = m_partition.at(_ind);
         m_results.put(_ind, transform_reduce_at_least_2(p.first, p.last));
     }
-    
-    static void dispatch(void *_ctx, size_t _ind) {
-        static_cast<TransformReduce*>(_ctx)->run(_ind);
+
+    static void dispatch(void *_ctx, size_t _ind)
+    {
+        static_cast<TransformReduce *>(_ctx)->run(_ind);
     }
-    
-    T transform_reduce_at_least_2(It _first, It _last) {
+
+    T transform_reduce_at_least_2(It _first, It _last)
+    {
         auto next = _first;
         T val = m_reduce(m_transform(*_first), m_transform(*++next));
-        while (++next != _last)
+        while( ++next != _last )
             val = m_reduce(std::move(val), m_transform(*next));
         return val;
     }
 };
 
-}
+} // namespace internal
 
 template <class FwdIt, class T, class BinOp, class UnOp>
 T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transform_op) noexcept
@@ -229,35 +218,32 @@ T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transfo
     const auto chunks = internal::work_chunks_min_fraction_2(count);
     if( chunks > 1 ) {
         try {
-            internal::TransformReduce<FwdIt, T, BinOp, UnOp> op{ static_cast<size_t>(count), chunks, first, reduce_op, transform_op };
+            internal::TransformReduce<FwdIt, T, BinOp, UnOp> op{
+                static_cast<size_t>(count), chunks, first, reduce_op, transform_op};
             internal::dispatch_apply(chunks, &op, op.dispatch);
             return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
-        }
-        catch(const internal::parallelism_exception&){
+        } catch( const internal::parallelism_exception & ) {
         }
     }
-    
+
     return std::transform_reduce(first, last, val, reduce_op, transform_op);
 }
 
 template <class It>
-internal::iterator_value_t<It>
-reduce(It first, It last) noexcept
+internal::iterator_value_t<It> reduce(It first, It last) noexcept
 {
     using T = internal::iterator_value_t<It>;
     return ::pstld::transform_reduce(first, last, T{}, std::plus<>{}, ::pstld::internal::no_op{});
 }
 
 template <class It, class T>
-T
-reduce(It first, It last, T val) noexcept
+T reduce(It first, It last, T val) noexcept
 {
     return ::pstld::transform_reduce(first, last, val, std::plus<>{}, ::pstld::internal::no_op{});
 }
 
 template <class It, class T, class BinOp>
-T
-reduce(It first, It last, T val, BinOp op) noexcept
+T reduce(It first, It last, T val, BinOp op) noexcept
 {
     return ::pstld::transform_reduce(first, last, val, op, ::pstld::internal::no_op{});
 }
@@ -265,66 +251,76 @@ reduce(It first, It last, T val, BinOp op) noexcept
 namespace internal {
 
 template <class It1, class It2, class T, class BinRedOp, class BinTrOp>
-struct TransformReduce2
-{
-    Partition<It1, is_random_iterator_v<It1> > m_partition1;
-    Partition<It2, is_random_iterator_v<It2> > m_partition2;
+struct TransformReduce2 {
+    Partition<It1, is_random_iterator_v<It1>> m_partition1;
+    Partition<It2, is_random_iterator_v<It2>> m_partition2;
     unitialized_array<T> m_results;
     BinRedOp m_reduce;
     BinTrOp m_transform;
-    
-    TransformReduce2(size_t _count, size_t _chunks, It1 _first1, It2 _first2, BinRedOp _reduce_op, BinTrOp _transform_op):
-        m_partition1(_first1, _count, _chunks),
-        m_partition2(_first2, _count, _chunks),
-        m_results(_chunks),
-        m_reduce(_reduce_op),
-        m_transform(_transform_op)
-    {}
-    
-    void run(size_t _ind) noexcept {
+
+    TransformReduce2(size_t _count,
+                     size_t _chunks,
+                     It1 _first1,
+                     It2 _first2,
+                     BinRedOp _reduce_op,
+                     BinTrOp _transform_op)
+        : m_partition1(_first1, _count, _chunks), m_partition2(_first2, _count, _chunks),
+          m_results(_chunks), m_reduce(_reduce_op), m_transform(_transform_op)
+    {
+    }
+
+    void run(size_t _ind) noexcept
+    {
         auto p1 = m_partition1.at(_ind);
         auto p2 = m_partition2.at(_ind);
         m_results.put(_ind, transform_reduce_at_least_2(p1.first, p1.last, p2.first));
     }
-    
-    static void dispatch(void *_ctx, size_t _ind) {
-        static_cast<TransformReduce2*>(_ctx)->run(_ind);
+
+    static void dispatch(void *_ctx, size_t _ind)
+    {
+        static_cast<TransformReduce2 *>(_ctx)->run(_ind);
     }
-    
-    T transform_reduce_at_least_2(It1 _first1, It1 _last1, It2 _first2) {
+
+    T transform_reduce_at_least_2(It1 _first1, It1 _last1, It2 _first2)
+    {
         auto next1 = _first1;
         auto next2 = _first2;
         T val = m_reduce(m_transform(*_first1, *_first2), m_transform(*++next1, *++next2));
-        while (++next1 != _last1)
+        while( ++next1 != _last1 )
             val = m_reduce(std::move(val), m_transform(*next1, *++next2));
         return val;
     }
 };
 
-}
+} // namespace internal
 
 template <class FwdIt1, class FwdIt2, class T, class BinRedOp, class BinTrOp>
-T transform_reduce(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinRedOp reduce_op, BinTrOp transform_op) noexcept
+T transform_reduce(FwdIt1 first1,
+                   FwdIt1 last1,
+                   FwdIt2 first2,
+                   T val,
+                   BinRedOp reduce_op,
+                   BinTrOp transform_op) noexcept
 {
     const auto count = std::distance(first1, last1);
     const auto chunks = internal::work_chunks_min_fraction_2(count);
     if( chunks > 1 ) {
         try {
-            internal::TransformReduce2<FwdIt1, FwdIt2, T, BinRedOp, BinTrOp> op{ static_cast<size_t>(count), chunks, first1, first2, reduce_op, transform_op };
+            internal::TransformReduce2<FwdIt1, FwdIt2, T, BinRedOp, BinTrOp> op{
+                static_cast<size_t>(count), chunks, first1, first2, reduce_op, transform_op};
             internal::dispatch_apply(chunks, &op, op.dispatch);
             return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
-        }
-        catch(const internal::parallelism_exception&){
+        } catch( const internal::parallelism_exception & ) {
         }
     }
     return std::transform_reduce(first1, last1, first2, val, reduce_op, transform_op);
 }
 
 template <class It1, class It2, class T>
-T
-transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
+T transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
 {
-    return ::pstld::transform_reduce(first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
+    return ::pstld::transform_reduce(
+        first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
 }
 
-}
+} // namespace pstld
