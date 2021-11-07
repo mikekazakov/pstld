@@ -12,22 +12,22 @@ namespace execution
 
 class sequenced_policy {
     public:
-    using __standard_execution_policy  = int;
+    using __standard_execution_policy = int;
     static constexpr bool __enabled = false;
 };
 class parallel_policy {
     public:
-    using __standard_execution_policy  = int;
+    using __standard_execution_policy = int;
     static constexpr bool __enabled = true;
 };
 class parallel_unsequenced_policy {
     public:
-    using __standard_execution_policy  = int;
+    using __standard_execution_policy = int;
     static constexpr bool __enabled = true;
 };
 class unsequenced_policy {
     public:
-    using __standard_execution_policy  = int;
+    using __standard_execution_policy = int;
     static constexpr bool __enabled = false;
 };
 
@@ -57,11 +57,10 @@ template <class ExPo, class It>
 execution::__enable_if_execution_policy<ExPo, typename iterator_traits<It>::value_type>
 reduce(ExPo&&, It first, It last) noexcept
 {
-    using T = typename iterator_traits<It>::value_type;
     if constexpr (remove_reference_t<ExPo>::__enabled)
-        return ::pstld::transform_reduce(first, last, T{}, std::plus<T>{}, pstld::internal::no_op{});
+        return ::pstld::reduce(first, last);
     else
-        return ::std::reduce(first, last, T{}, std::plus<T>{});
+        return ::std::reduce(first, last);
 }
 
 template <class ExPo, class It, class T>
@@ -69,9 +68,9 @@ execution::__enable_if_execution_policy<ExPo, T>
 reduce(ExPo&&, It first, It last, T val) noexcept
 {
     if constexpr (remove_reference_t<ExPo>::__enabled)
-        return ::pstld::transform_reduce(first, last, val, std::plus<T>{}, pstld::internal::no_op{});
+        return ::pstld::reduce(first, last, val);
     else
-        return ::std::reduce(first, last, val, std::plus<T>{});
+        return ::std::reduce(first, last, val);
 }
 
 template <class ExPo, class It, class T, class BinOp>
@@ -79,7 +78,7 @@ execution::__enable_if_execution_policy<ExPo, T>
 reduce(ExPo&&, It first, It last, T val, BinOp op) noexcept
 {
     if constexpr (remove_reference_t<ExPo>::__enabled)
-        return ::pstld::transform_reduce(first, last, val, op, pstld::internal::no_op{});
+        return ::pstld::reduce(first, last, val, op);
     else
         return ::std::reduce(first, last, val, op);
 }
@@ -91,9 +90,9 @@ execution::__enable_if_execution_policy<ExPo, T>
 transform_reduce(ExPo&&, It1 first1, It1 last1, It2 first2, T val) noexcept
 {
     if constexpr (remove_reference_t<ExPo>::__enabled)
-        return ::pstld::transform_reduce(first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
+        return ::pstld::transform_reduce(first1, last1, first2, val);
     else
-        return ::std::transform_reduce(first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
+        return ::std::transform_reduce(first1, last1, first2, val);
 }
 
 template <class ExPo, class It1, class It2, class T, class BinRedOp, class BinTrOp>

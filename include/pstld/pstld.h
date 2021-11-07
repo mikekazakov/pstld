@@ -18,6 +18,9 @@ using iterator_category_t = typename std::iterator_traits<It>::iterator_category
 template <class It>
 inline constexpr bool is_random_iterator_v = std::is_convertible_v<iterator_category_t<It>, std::random_access_iterator_tag>;
 
+template <class It>
+using iterator_value_t = typename std::iterator_traits<It>::value_type;
+
 struct no_op {
     template <typename T>
     T&& operator()(T&& v) const
@@ -197,17 +200,14 @@ struct TransformReduce
         m_results(_chunks),
         m_reduce(_reduce_op),
         m_transform(_transform_op)
-    {
-    }
+    {}
     
-    void run(size_t _ind) noexcept
-    {
+    void run(size_t _ind) noexcept {
         auto p = m_partition.at(_ind);
         m_results.put(_ind, transform_reduce_at_least_2(p.first, p.last));
     }
     
-    static void dispatch(void *_ctx, size_t _ind)
-    {
+    static void dispatch(void *_ctx, size_t _ind) {
         static_cast<TransformReduce*>(_ctx)->run(_ind);
     }
     
@@ -223,7 +223,7 @@ struct TransformReduce
 }
 
 template <class FwdIt, class T, class BinOp, class UnOp>
-[[nodiscard]] T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transform_op) noexcept
+T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transform_op) noexcept
 {
     const auto count = std::distance(first, last);
     const auto chunks = internal::work_chunks_min_fraction_2(count);
@@ -240,6 +240,27 @@ template <class FwdIt, class T, class BinOp, class UnOp>
     return std::transform_reduce(first, last, val, reduce_op, transform_op);
 }
 
+template <class It>
+internal::iterator_value_t<It>
+reduce(It first, It last) noexcept
+{
+    using T = internal::iterator_value_t<It>;
+    return ::pstld::transform_reduce(first, last, T{}, std::plus<>{}, ::pstld::internal::no_op{});
+}
+
+template <class It, class T>
+T
+reduce(It first, It last, T val) noexcept
+{
+    return ::pstld::transform_reduce(first, last, val, std::plus<>{}, ::pstld::internal::no_op{});
+}
+
+template <class It, class T, class BinOp>
+T
+reduce(It first, It last, T val, BinOp op) noexcept
+{
+    return ::pstld::transform_reduce(first, last, val, op, ::pstld::internal::no_op{});
+}
 
 namespace internal {
 
@@ -258,18 +279,15 @@ struct TransformReduce2
         m_results(_chunks),
         m_reduce(_reduce_op),
         m_transform(_transform_op)
-    {
-    }
+    {}
     
-    void run(size_t _ind) noexcept
-    {
+    void run(size_t _ind) noexcept {
         auto p1 = m_partition1.at(_ind);
         auto p2 = m_partition2.at(_ind);
         m_results.put(_ind, transform_reduce_at_least_2(p1.first, p1.last, p2.first));
     }
     
-    static void dispatch(void *_ctx, size_t _ind)
-    {
+    static void dispatch(void *_ctx, size_t _ind) {
         static_cast<TransformReduce2*>(_ctx)->run(_ind);
     }
     
@@ -286,7 +304,7 @@ struct TransformReduce2
 }
 
 template <class FwdIt1, class FwdIt2, class T, class BinRedOp, class BinTrOp>
-[[nodiscard]] T transform_reduce(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinRedOp reduce_op, BinTrOp transform_op) noexcept
+T transform_reduce(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinRedOp reduce_op, BinTrOp transform_op) noexcept
 {
     const auto count = std::distance(first1, last1);
     const auto chunks = internal::work_chunks_min_fraction_2(count);
@@ -300,6 +318,13 @@ template <class FwdIt1, class FwdIt2, class T, class BinRedOp, class BinTrOp>
         }
     }
     return std::transform_reduce(first1, last1, first2, val, reduce_op, transform_op);
+}
+
+template <class It1, class It2, class T>
+T
+transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
+{
+    return ::pstld::transform_reduce(first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
 }
 
 }
