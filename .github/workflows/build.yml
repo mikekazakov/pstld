@@ -31,3 +31,10 @@ jobs:
         cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -fsanitize=address" ..
         make -j pstld-build-llvm-tests
         make test
+    - name: Build and run unit tests (UBSAN)
+      run: |
+        mkdir build-asan
+        cd build-asan
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -fsanitize=undefined" ..
+        make -j pstld-build-llvm-tests
+        make test
