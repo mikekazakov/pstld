@@ -1,3 +1,4 @@
+// Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #include <pstld/pstld.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>

@@ -1,3 +1,4 @@
+// Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #pragma once
 #include <algorithm>
 #include <numeric>
@@ -119,8 +120,8 @@ struct Partition<It, true> {
     It base;
     size_t fraction;
     size_t leftover;
-    Partition(It _first, size_t _count, size_t _chunks)
-        : base(_first), fraction(_count / _chunks), leftover(_count % _chunks)
+    Partition(It first, size_t count, size_t chunks)
+        : base(first), fraction(count / chunks), leftover(count % chunks)
     {
     }
 
@@ -150,12 +151,12 @@ struct Partition<It, true> {
 template <class It>
 struct Partition<It, false> {
     parallelism_vector<ItRange<It>> segments;
-    Partition(It _first, size_t _count, size_t _chunks) : segments(_chunks)
+    Partition(It first, size_t count, size_t chunks) : segments(chunks)
     {
-        size_t fraction = _count / _chunks;
-        size_t leftover = _count % _chunks;
-        It it = _first;
-        for( size_t i = 0; i != _chunks; ++i ) {
+        size_t fraction = count / chunks;
+        size_t leftover = count % chunks;
+        It it = first;
+        for( size_t i = 0; i != chunks; ++i ) {
             auto first = it;
             auto diff = fraction;
             if( leftover != 0 ) {
@@ -187,23 +188,23 @@ struct TransformReduce : Dispatchable<TransformReduce<It, T, BinOp, UnOp>> {
     BinOp m_reduce;
     UnOp m_transform;
 
-    TransformReduce(size_t _count, size_t _chunks, It _first, BinOp _reduce_op, UnOp _transform_op)
-        : m_partition(_first, _count, _chunks), m_results(_chunks), m_reduce(_reduce_op),
-          m_transform(_transform_op)
+    TransformReduce(size_t count, size_t chunks, It first, BinOp reduce_op, UnOp transform_op)
+        : m_partition(first, count, chunks), m_results(chunks), m_reduce(reduce_op),
+          m_transform(transform_op)
     {
     }
 
-    void run(size_t _ind) noexcept
+    void run(size_t ind) noexcept
     {
-        auto p = m_partition.at(_ind);
-        m_results.put(_ind, transform_reduce_at_least_2(p.first, p.last));
+        auto p = m_partition.at(ind);
+        m_results.put(ind, transform_reduce_at_least_2(p.first, p.last));
     }
 
-    T transform_reduce_at_least_2(It _first, It _last)
+    T transform_reduce_at_least_2(It first, It last)
     {
-        auto next = _first;
-        T val = m_reduce(m_transform(*_first), m_transform(*++next));
-        while( ++next != _last )
+        auto next = first;
+        T val = m_reduce(m_transform(*first), m_transform(*++next));
+        while( ++next != last )
             val = m_reduce(std::move(val), m_transform(*next));
         return val;
     }
@@ -258,30 +259,30 @@ struct TransformReduce2 : Dispatchable<TransformReduce2<It1, It2, T, BinRedOp, B
     BinRedOp m_reduce;
     BinTrOp m_transform;
 
-    TransformReduce2(size_t _count,
-                     size_t _chunks,
-                     It1 _first1,
-                     It2 _first2,
-                     BinRedOp _reduce_op,
-                     BinTrOp _transform_op)
-        : m_partition1(_first1, _count, _chunks), m_partition2(_first2, _count, _chunks),
-          m_results(_chunks), m_reduce(_reduce_op), m_transform(_transform_op)
+    TransformReduce2(size_t count,
+                     size_t chunks,
+                     It1 first1,
+                     It2 first2,
+                     BinRedOp reduce_op,
+                     BinTrOp transform_op)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
+          m_results(chunks), m_reduce(reduce_op), m_transform(transform_op)
     {
     }
 
-    void run(size_t _ind) noexcept
+    void run(size_t ind) noexcept
     {
-        auto p1 = m_partition1.at(_ind);
-        auto p2 = m_partition2.at(_ind);
-        m_results.put(_ind, transform_reduce_at_least_2(p1.first, p1.last, p2.first));
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        m_results.put(ind, transform_reduce_at_least_2(p1.first, p1.last, p2.first));
     }
 
-    T transform_reduce_at_least_2(It1 _first1, It1 _last1, It2 _first2)
+    T transform_reduce_at_least_2(It1 first1, It1 last1, It2 first2)
     {
-        auto next1 = _first1;
-        auto next2 = _first2;
-        T val = m_reduce(m_transform(*_first1, *_first2), m_transform(*++next1, *++next2));
-        while( ++next1 != _last1 )
+        auto next1 = first1;
+        auto next2 = first2;
+        T val = m_reduce(m_transform(*first1, *first2), m_transform(*++next1, *++next2));
+        while( ++next1 != last1 )
             val = m_reduce(std::move(val), m_transform(*next1, *++next2));
         return val;
     }
@@ -327,16 +328,16 @@ struct AllOf : Dispatchable<AllOf<It, UnPred, Expected, Init>> {
     std::atomic_bool m_done{false};
     bool m_result = Init;
 
-    AllOf(size_t _count, size_t _chunks, It _first, UnPred _pred)
-        : m_partition(_first, _count, _chunks), m_pred(_pred)
+    AllOf(size_t count, size_t chunks, It first, UnPred pred)
+        : m_partition(first, count, chunks), m_pred(pred)
     {
     }
 
-    void run(size_t _ind) noexcept
+    void run(size_t ind) noexcept
     {
         if( m_done )
             return;
-        for( auto p = m_partition.at(_ind); p.first != p.last; ++p.first )
+        for( auto p = m_partition.at(ind); p.first != p.last; ++p.first )
             if( static_cast<bool>(m_pred(*p.first)) == !Expected ) {
                 m_done = true;
                 m_result = !Init;

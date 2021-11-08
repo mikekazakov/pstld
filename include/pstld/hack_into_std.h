@@ -1,3 +1,4 @@
+// Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #pragma once
 #include <algorithm>
 #include <numeric>
@@ -11,25 +12,21 @@ namespace execution {
 class sequenced_policy
 {
 public:
-    using __standard_execution_policy = int;
     static constexpr bool __enabled = false;
 };
 class parallel_policy
 {
 public:
-    using __standard_execution_policy = int;
     static constexpr bool __enabled = true;
 };
 class parallel_unsequenced_policy
 {
 public:
-    using __standard_execution_policy = int;
     static constexpr bool __enabled = true;
 };
 class unsequenced_policy
 {
 public:
-    using __standard_execution_policy = int;
     static constexpr bool __enabled = false;
 };
 
