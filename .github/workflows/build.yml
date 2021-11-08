@@ -10,10 +10,24 @@ jobs:
     - name: Download LLVM-PSTL unit tests
       run: |
         cd test-llvm-pstl && ./bootstrap.sh
-    - name: Build and run unit tests
+    - name: Build and run unit tests (Release)
       run: |
-        mkdir build
-        cd build
-        cmake ..
-        make pstld-build-llvm-tests
+        mkdir build-release
+        cd build-release
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        make -j pstld-build-llvm-tests
+        make test
+    - name: Build and run unit tests (Debug)
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake -DCMAKE_BUILD_TYPE=Debug ..
+        make -j pstld-build-llvm-tests
+        make test
+    - name: Build and run unit tests (ASAN)
+      run: |
+        mkdir build-asan
+        cd build-asan
+        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -fsanitize=address" ..
+        make -j pstld-build-llvm-tests
         make test
