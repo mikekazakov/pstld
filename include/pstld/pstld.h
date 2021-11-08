@@ -111,7 +111,7 @@ struct ItRange {
     It last;
 };
 
-template <class It, bool IsRandomAccess>
+template <class It, bool IsRandomAccess = is_random_iterator_v<It>>
 struct Partition;
 
 template <class It>
@@ -171,13 +171,18 @@ struct Partition<It, false> {
     ItRange<It> at(size_t chunk_no) { return segments[chunk_no]; }
 };
 
+template <class T>
+struct Dispatchable {
+    static void dispatch(void *ctx, size_t ind) noexcept { static_cast<T *>(ctx)->run(ind); }
+};
+
 } // namespace internal
 
 namespace internal {
 
 template <class It, class T, class BinOp, class UnOp>
-struct TransformReduce {
-    Partition<It, is_random_iterator_v<It>> m_partition;
+struct TransformReduce : Dispatchable<TransformReduce<It, T, BinOp, UnOp>> {
+    Partition<It> m_partition;
     unitialized_array<T> m_results;
     BinOp m_reduce;
     UnOp m_transform;
@@ -192,11 +197,6 @@ struct TransformReduce {
     {
         auto p = m_partition.at(_ind);
         m_results.put(_ind, transform_reduce_at_least_2(p.first, p.last));
-    }
-
-    static void dispatch(void *_ctx, size_t _ind)
-    {
-        static_cast<TransformReduce *>(_ctx)->run(_ind);
     }
 
     T transform_reduce_at_least_2(It _first, It _last)
@@ -251,9 +251,9 @@ T reduce(It first, It last, T val, BinOp op) noexcept
 namespace internal {
 
 template <class It1, class It2, class T, class BinRedOp, class BinTrOp>
-struct TransformReduce2 {
-    Partition<It1, is_random_iterator_v<It1>> m_partition1;
-    Partition<It2, is_random_iterator_v<It2>> m_partition2;
+struct TransformReduce2 : Dispatchable<TransformReduce2<It1, It2, T, BinRedOp, BinTrOp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
     unitialized_array<T> m_results;
     BinRedOp m_reduce;
     BinTrOp m_transform;
@@ -274,11 +274,6 @@ struct TransformReduce2 {
         auto p1 = m_partition1.at(_ind);
         auto p2 = m_partition2.at(_ind);
         m_results.put(_ind, transform_reduce_at_least_2(p1.first, p1.last, p2.first));
-    }
-
-    static void dispatch(void *_ctx, size_t _ind)
-    {
-        static_cast<TransformReduce2 *>(_ctx)->run(_ind);
     }
 
     T transform_reduce_at_least_2(It1 _first1, It1 _last1, It2 _first2)
@@ -321,6 +316,86 @@ T transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
 {
     return ::pstld::transform_reduce(
         first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
+}
+
+namespace internal {
+
+template <class It, class UnPred, bool Expected, bool Init>
+struct AllOf : Dispatchable<AllOf<It, UnPred, Expected, Init>> {
+    Partition<It> m_partition;
+    UnPred m_pred;
+    std::atomic_bool m_done{false};
+    bool m_result = Init;
+
+    AllOf(size_t _count, size_t _chunks, It _first, UnPred _pred)
+        : m_partition(_first, _count, _chunks), m_pred(_pred)
+    {
+    }
+
+    void run(size_t _ind) noexcept
+    {
+        if( m_done )
+            return;
+        for( auto p = m_partition.at(_ind); p.first != p.last; ++p.first )
+            if( static_cast<bool>(m_pred(*p.first)) == !Expected ) {
+                m_done = true;
+                m_result = !Init;
+                return;
+            }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class UnPred>
+bool all_of(FwdIt first, FwdIt last, UnPred pred) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::AllOf<FwdIt, UnPred, true, true> op{
+                static_cast<size_t>(count), chunks, first, pred};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return op.m_result;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::all_of(first, last, pred);
+}
+
+template <class FwdIt, class UnPred>
+bool none_of(FwdIt first, FwdIt last, UnPred pred) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::AllOf<FwdIt, UnPred, false, true> op{
+                static_cast<size_t>(count), chunks, first, pred};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return op.m_result;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::none_of(first, last, pred);
+}
+
+template <class FwdIt, class UnPred>
+bool any_of(FwdIt first, FwdIt last, UnPred pred) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::AllOf<FwdIt, UnPred, false, false> op{
+                static_cast<size_t>(count), chunks, first, pred};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return op.m_result;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::any_of(first, last, pred);
 }
 
 } // namespace pstld

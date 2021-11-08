@@ -63,6 +63,42 @@ using __enable_if_execution_policy =
 
 } // namespace execution
 
+// 25.6.1 - all_of /////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class UnPred>
+execution::__enable_if_execution_policy<ExPo, bool>
+all_of(ExPo &&, It first, It last, UnPred p) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::all_of(first, last, p);
+    else
+        return ::std::all_of(first, last, p);
+}
+
+// 25.6.2 - any_of ////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class UnPred>
+execution::__enable_if_execution_policy<ExPo, bool>
+any_of(ExPo &&, It first, It last, UnPred p) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::any_of(first, last, p);
+    else
+        return ::std::any_of(first, last, p);
+}
+
+// 25.6.3 - none_of ////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class UnPred>
+execution::__enable_if_execution_policy<ExPo, bool>
+none_of(ExPo &&, It first, It last, UnPred p) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::none_of(first, last, p);
+    else
+        return ::std::none_of(first, last, p);
+}
+
 // 25.10.4 - reduce ////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It>
