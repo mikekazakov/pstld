@@ -451,4 +451,52 @@ void for_each_n(FwdIt first, Size count, Func func) noexcept
     std::for_each_n(first, count, func);
 }
 
+namespace internal {
+
+template <class It, class Pred>
+struct Count : Dispatchable<Count<It, Pred>> {
+    using Diff = typename std::iterator_traits<It>::difference_type;
+    Partition<It> m_partition;
+    Pred m_pred;
+    std::atomic<Diff> m_result{};
+
+    Count(size_t count, size_t chunks, It first, Pred pred)
+        : m_partition(first, count, chunks), m_pred(pred)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        m_result += std::count_if(p.first, p.last, m_pred);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Pred>
+typename std::iterator_traits<FwdIt>::difference_type
+count_if(FwdIt first, FwdIt last, Pred pred) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Count<FwdIt, Pred> op{static_cast<size_t>(count), chunks, first, pred};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return op.m_result;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::count_if(first, last, pred);
+}
+
+template <class FwdIt, class T>
+typename std::iterator_traits<FwdIt>::difference_type
+count(FwdIt first, FwdIt last, const T &value) noexcept
+{
+    return ::pstld::count_if(
+        first, last, [&value](auto &iter_value) { return value == iter_value; });
+}
+
 } // namespace pstld

@@ -118,6 +118,28 @@ for_each_n(ExPo &&, It first, Size count, Func f) noexcept
         ::std::for_each_n(first, count, f);
 }
 
+// 25.6.9 - count, count_if reduce /////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class T>
+execution::__enable_if_execution_policy<ExPo, typename std::iterator_traits<It>::difference_type>
+count(ExPo &&, It first, It last, const T &value) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::count(first, last, value);
+    else
+        return ::std::count(first, last, value);
+}
+
+template <class ExPo, class It, class Pred>
+execution::__enable_if_execution_policy<ExPo, typename std::iterator_traits<It>::difference_type>
+count_if(ExPo &&, It first, It last, Pred pred) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::count_if(first, last, pred);
+    else
+        return ::std::count_if(first, last, pred);
+}
+
 // 25.10.4 - reduce ////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It>
