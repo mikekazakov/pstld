@@ -433,7 +433,7 @@ void for_each(FwdIt first, FwdIt last, Func func) noexcept
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    return std::for_each(first, last, func);
+    std::for_each(first, last, func);
 }
 
 template <class FwdIt, class Size, class Func>
@@ -448,7 +448,7 @@ void for_each_n(FwdIt first, Size count, Func func) noexcept
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    return std::for_each_n(first, count, func);
+    std::for_each_n(first, count, func);
 }
 
 } // namespace pstld

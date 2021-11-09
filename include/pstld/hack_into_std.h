@@ -103,9 +103,9 @@ execution::__enable_if_execution_policy<ExPo, void>
 for_each(ExPo &&, It first, It last, Func f) noexcept
 {
     if constexpr( remove_reference_t<ExPo>::__enabled )
-        return ::pstld::for_each(first, last, f);
+        ::pstld::for_each(first, last, f);
     else
-        return ::std::for_each(first, last, f);
+        ::std::for_each(first, last, f);
 }
 
 template <class ExPo, class It, class Size, class Func>
@@ -113,9 +113,9 @@ execution::__enable_if_execution_policy<ExPo, void>
 for_each_n(ExPo &&, It first, Size count, Func f) noexcept
 {
     if constexpr( remove_reference_t<ExPo>::__enabled )
-        return ::pstld::for_each_n(first, count, f);
+        ::pstld::for_each_n(first, count, f);
     else
-        return ::std::for_each_n(first, count, f);
+        ::std::for_each_n(first, count, f);
 }
 
 // 25.10.4 - reduce ////////////////////////////////////////////////////////////////////////////////
