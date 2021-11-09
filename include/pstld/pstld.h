@@ -399,4 +399,56 @@ bool any_of(FwdIt first, FwdIt last, UnPred pred) noexcept
     return std::any_of(first, last, pred);
 }
 
+namespace internal {
+
+template <class It, class Func>
+struct ForEach : Dispatchable<ForEach<It, Func>> {
+    Partition<It> m_partition;
+    Func m_func;
+
+    ForEach(size_t count, size_t chunks, It first, Func func)
+        : m_partition(first, count, chunks), m_func(func)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        for( auto p = m_partition.at(ind); p.first != p.last; ++p.first )
+            m_func(*p.first);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Func>
+void for_each(FwdIt first, FwdIt last, Func func) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::ForEach<FwdIt, Func> op{static_cast<size_t>(count), chunks, first, func};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::for_each(first, last, func);
+}
+
+template <class FwdIt, class Size, class Func>
+void for_each_n(FwdIt first, Size count, Func func) noexcept
+{
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::ForEach<FwdIt, Func> op{static_cast<size_t>(count), chunks, first, func};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::for_each_n(first, count, func);
+}
+
 } // namespace pstld
