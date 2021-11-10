@@ -118,7 +118,39 @@ for_each_n(ExPo &&, It first, Size count, Func f) noexcept
         ::std::for_each_n(first, count, f);
 }
 
-// 25.6.9 - count, count_if reduce /////////////////////////////////////////////////////////////////
+// 25.6.5 - find, find_if, find_if_not /////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class T>
+execution::__enable_if_execution_policy<ExPo, It>
+find(ExPo &&, It first, It last, const T &value) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::find(first, last, value);
+    else
+        return ::std::find(first, last, value);
+}
+
+template <class ExPo, class It, class Pred>
+execution::__enable_if_execution_policy<ExPo, It>
+find_if(ExPo &&, It first, It last, Pred pred) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::find_if(first, last, pred);
+    else
+        return ::std::find_if(first, last, pred);
+}
+
+template <class ExPo, class It, class Pred>
+execution::__enable_if_execution_policy<ExPo, It>
+find_if_not(ExPo &&, It first, It last, Pred pred) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::find_if_not(first, last, pred);
+    else
+        return ::std::find_if_not(first, last, pred);
+}
+
+// 25.6.9 - count, count_if ////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
 execution::__enable_if_execution_policy<ExPo, typename std::iterator_traits<It>::difference_type>

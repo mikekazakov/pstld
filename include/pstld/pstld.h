@@ -4,6 +4,8 @@
 #include <numeric>
 #include <iterator>
 #include <vector>
+#include <limits>
+#include <mutex>
 
 namespace pstld {
 
@@ -22,6 +24,13 @@ inline constexpr bool is_random_iterator_v =
 
 template <class It>
 using iterator_value_t = typename std::iterator_traits<It>::value_type;
+
+template <class T>
+inline constexpr bool can_be_atomic_v = std::conjunction_v<std::is_trivially_copyable<T>,
+                                                           std::is_copy_constructible<T>,
+                                                           std::is_move_constructible<T>,
+                                                           std::is_copy_assignable<T>,
+                                                           std::is_move_assignable<T>>;
 
 struct no_op {
     template <typename T>
@@ -172,6 +181,42 @@ struct Partition<It, false> {
     ItRange<It> at(size_t chunk_no) { return segments[chunk_no]; }
 };
 
+template <class It, bool = is_random_iterator_v<It> &&can_be_atomic_v<It>>
+struct MinIteratorResult;
+
+template <class It>
+struct MinIteratorResult<It, true> {
+    std::atomic<It> min;
+    MinIteratorResult(It last) : min{last} {}
+
+    void put(size_t, It it)
+    {
+        It prev = min;
+        while( prev > it && !min.compare_exchange_weak(prev, it) )
+            ;
+    }
+};
+
+template <class It>
+struct MinIteratorResult<It, false> {
+    std::atomic<size_t> min_chunk;
+    It min;
+    std::mutex mutex;
+
+    MinIteratorResult(It last) : min_chunk{std::numeric_limits<size_t>::max()}, min{last} {}
+
+    void put(size_t chunk, It it)
+    {
+        size_t prev = std::numeric_limits<size_t>::max();
+        while( !min_chunk.compare_exchange_weak(prev, chunk) )
+            if( prev < chunk )
+                return;
+
+        std::lock_guard lock{mutex};
+        if( min_chunk == chunk )
+            min = it;
+    }
+};
 template <class T>
 struct Dispatchable {
     static void dispatch(void *ctx, size_t ind) noexcept { static_cast<T *>(ctx)->run(ind); }
@@ -496,7 +541,61 @@ typename std::iterator_traits<FwdIt>::difference_type
 count(FwdIt first, FwdIt last, const T &value) noexcept
 {
     return ::pstld::count_if(
-        first, last, [&value](auto &iter_value) { return value == iter_value; });
+        first, last, [&value](auto &iter_value) { return iter_value == value; });
+}
+
+namespace internal {
+
+template <class It, class Pred>
+struct Find : Dispatchable<Find<It, Pred>> {
+    Partition<It> m_partition;
+    MinIteratorResult<It> m_result;
+    Pred m_pred;
+
+    Find(size_t count, size_t chunks, It first, It last, Pred pred)
+        : m_partition(first, count, chunks), m_result{last}, m_pred(pred)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        auto it = std::find_if(p.first, p.last, m_pred);
+        if( it != p.last )
+            m_result.put(ind, it);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Pred>
+FwdIt find_if(FwdIt first, FwdIt last, Pred pred)
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Find<FwdIt, Pred> op{static_cast<size_t>(count), chunks, first, last, pred};
+            internal::dispatch_apply(chunks, &op, op.dispatch);
+            return op.m_result.min;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::find_if(first, last, pred);
+}
+
+template <class FwdIt, class T>
+FwdIt find(FwdIt first, FwdIt last, const T &value)
+{
+    return ::pstld::find_if(
+        first, last, [&value](auto &iter_value) { return iter_value == value; });
+}
+
+template <class FwdIt, class Pred>
+FwdIt find_if_not(FwdIt first, FwdIt last, Pred pred)
+{
+    return ::pstld::find_if(
+        first, last, [&pred](auto &value) { return !static_cast<bool>(pred(value)); });
 }
 
 } // namespace pstld
