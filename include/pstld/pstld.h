@@ -569,7 +569,7 @@ struct Find : Dispatchable<Find<It, Pred>> {
 } // namespace internal
 
 template <class FwdIt, class Pred>
-FwdIt find_if(FwdIt first, FwdIt last, Pred pred)
+FwdIt find_if(FwdIt first, FwdIt last, Pred pred) noexcept
 {
     const auto count = std::distance(first, last);
     const auto chunks = internal::work_chunks_min_fraction_1(count);
@@ -585,14 +585,14 @@ FwdIt find_if(FwdIt first, FwdIt last, Pred pred)
 }
 
 template <class FwdIt, class T>
-FwdIt find(FwdIt first, FwdIt last, const T &value)
+FwdIt find(FwdIt first, FwdIt last, const T &value) noexcept
 {
     return ::pstld::find_if(
         first, last, [&value](auto &iter_value) { return iter_value == value; });
 }
 
 template <class FwdIt, class Pred>
-FwdIt find_if_not(FwdIt first, FwdIt last, Pred pred)
+FwdIt find_if_not(FwdIt first, FwdIt last, Pred pred) noexcept
 {
     return ::pstld::find_if(
         first, last, [&pred](auto &value) { return !static_cast<bool>(pred(value)); });
