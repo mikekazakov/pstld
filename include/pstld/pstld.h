@@ -598,4 +598,22 @@ FwdIt find_if_not(FwdIt first, FwdIt last, Pred pred) noexcept
         first, last, [&pred](auto &value) { return !static_cast<bool>(pred(value)); });
 }
 
+template <class FwdIt1, class FwdIt2>
+FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+{
+    return ::pstld::find_if(first1, last1, [first2, last2](auto &value) {
+        return std::find(first2, last2, value) != last2;
+    });
+}
+
+template <class FwdIt1, class FwdIt2, class Pred>
+FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred pred) noexcept
+{
+    return ::pstld::find_if(first1, last1, [first2, last2, &pred](auto &value1) {
+        return std::find_if(first2, last2, [&value1, &pred](auto &value2) {
+                   return static_cast<bool>(pred(value1, value2));
+               }) != last2;
+    });
+}
+
 } // namespace pstld

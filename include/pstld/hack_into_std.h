@@ -150,6 +150,28 @@ find_if_not(ExPo &&, It first, It last, Pred pred) noexcept
         return ::std::find_if_not(first, last, pred);
 }
 
+// 25.6.7 - find_first_of //////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It1>
+find_first_of(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::find_first_of(first1, last1, first2, last2);
+    else
+        return ::std::find_first_of(first1, last1, first2, last2);
+}
+
+template <class ExPo, class It1, class It2, class Pred>
+execution::__enable_if_execution_policy<ExPo, It1>
+find_first_of(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::find_first_of(first1, last1, first2, last2, pred);
+    else
+        return ::std::find_first_of(first1, last1, first2, last2, pred);
+}
+
 // 25.6.9 - count, count_if ////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
