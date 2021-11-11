@@ -8,10 +8,11 @@ add_custom_target(check-pstld-llvm
     COMMENT "Build and run all the unit tests.")
 
 set(UNIT_TESTS
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/adjacent_find.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/all_of.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/any_of.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/count.pass.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/find.pass.cpp    
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/find.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/find_first_of.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/find_if.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/for_each.pass.cpp

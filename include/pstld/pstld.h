@@ -616,4 +616,57 @@ FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, P
     });
 }
 
+namespace internal {
+
+template <class It, class Pred>
+struct AdjacentFind : Dispatchable<AdjacentFind<It, Pred>> {
+    Partition<It> m_partition;
+    MinIteratorResult<It> m_result;
+    Pred m_pred;
+
+    AdjacentFind(size_t count, size_t chunks, It first, It last, Pred pred)
+        : m_partition(first, count, chunks), m_result{last}, m_pred(pred)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        for( auto it1 = p.first, it2 = p.first; it1 != p.last; it1 = it2 ) {
+            ++it2;
+            if( m_pred(*it1, *it2) ) {
+                m_result.put(ind, it1);
+                return;
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Pred>
+FwdIt adjacent_find(FwdIt first, FwdIt last, Pred pred) noexcept
+{
+    const auto count = std::distance(first, last);
+    if( count > 1 ) {
+        const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
+        if( chunks > 1 ) {
+            try {
+                internal::AdjacentFind<FwdIt, Pred> op{
+                    static_cast<size_t>(count - 1), chunks, first, last, pred};
+                internal::dispatch_apply(chunks, &op, op.dispatch);
+                return op.m_result.min;
+            } catch( const internal::parallelism_exception & ) {
+            }
+        }
+    }
+    return std::adjacent_find(first, last, pred);
+}
+
+template <class FwdIt>
+FwdIt adjacent_find(FwdIt first, FwdIt last) noexcept
+{
+    return ::pstld::adjacent_find(first, last, [](auto &v1, auto &v2) { return v1 == v2; });
+}
+
 } // namespace pstld

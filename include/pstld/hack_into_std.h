@@ -172,6 +172,27 @@ find_first_of(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) 
         return ::std::find_first_of(first1, last1, first2, last2, pred);
 }
 
+// 25.6.8 - adjacent_find //////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It>
+execution::__enable_if_execution_policy<ExPo, It> adjacent_find(ExPo &&, It first, It last) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::adjacent_find(first, last);
+    else
+        return ::std::adjacent_find(first, last);
+}
+
+template <class ExPo, class It, class Pred>
+execution::__enable_if_execution_policy<ExPo, It>
+adjacent_find(ExPo &&, It first, It last, Pred pred) noexcept
+{
+    if constexpr( remove_reference_t<ExPo>::__enabled )
+        return ::pstld::adjacent_find(first, last, pred);
+    else
+        return ::std::adjacent_find(first, last, pred);
+}
+
 // 25.6.9 - count, count_if ////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
