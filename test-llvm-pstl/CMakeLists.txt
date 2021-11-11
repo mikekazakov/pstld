@@ -22,10 +22,11 @@ set(UNIT_TESTS
 )
 
 foreach(_file IN LISTS UNIT_TESTS)
-    file(RELATIVE_PATH _target "${CMAKE_CURRENT_SOURCE_DIR}" "${_file}")
-    string(REPLACE ".cpp" "" _target "${_target}")
+    file(RELATIVE_PATH _target "${CMAKE_CURRENT_LIST_DIR}" "${_file}")
+    string(REPLACE "llvm-project/pstl/test/" "" _target "${_target}")
+    string(REPLACE ".pass.cpp" "" _target "${_target}")
     string(REPLACE "/" "-" _target "${_target}")
-    set(_target "pstl-${_target}")
+    set(_target "llvm-test-${_target}")
 
     add_executable(${_target} EXCLUDE_FROM_ALL "${_file}")
     target_include_directories(${_target} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test")
