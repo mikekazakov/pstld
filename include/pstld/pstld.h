@@ -186,14 +186,19 @@ struct MinIteratorResult;
 
 template <class It>
 struct MinIteratorResult<It, true> {
+    std::atomic<size_t> min_chunk;
     std::atomic<It> min;
-    MinIteratorResult(It last) : min{last} {}
+    MinIteratorResult(It last) : min_chunk{std::numeric_limits<size_t>::max()}, min{last} {}
 
-    void put(size_t, It it)
+    void put(size_t chunk, It it)
     {
         It prev = min;
-        while( prev > it && !min.compare_exchange_weak(prev, it) )
-            ;
+        if( prev < it )
+            return;
+        while( !min.compare_exchange_weak(prev, it) )
+            if( prev < it )
+                return;
+        min_chunk = chunk;
     }
 };
 
@@ -559,10 +564,12 @@ struct Find : Dispatchable<Find<It, Pred>> {
 
     void run(size_t ind) noexcept
     {
-        auto p = m_partition.at(ind);
-        auto it = std::find_if(p.first, p.last, m_pred);
-        if( it != p.last )
-            m_result.put(ind, it);
+        if( ind < m_result.min_chunk ) {
+            auto p = m_partition.at(ind);
+            auto it = std::find_if(p.first, p.last, m_pred);
+            if( it != p.last )
+                m_result.put(ind, it);
+        }
     }
 };
 
@@ -631,12 +638,14 @@ struct AdjacentFind : Dispatchable<AdjacentFind<It, Pred>> {
 
     void run(size_t ind) noexcept
     {
-        auto p = m_partition.at(ind);
-        for( auto it1 = p.first, it2 = p.first; it1 != p.last; it1 = it2 ) {
-            ++it2;
-            if( m_pred(*it1, *it2) ) {
-                m_result.put(ind, it1);
-                return;
+        if( ind < m_result.min_chunk ) {
+            auto p = m_partition.at(ind);
+            for( auto it1 = p.first, it2 = p.first; it1 != p.last; it1 = it2 ) {
+                ++it2;
+                if( m_pred(*it1, *it2) ) {
+                    m_result.put(ind, it1);
+                    return;
+                }
             }
         }
     }
