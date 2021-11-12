@@ -192,13 +192,13 @@ struct MinIteratorResult<It, true> {
 
     void put(size_t chunk, It it)
     {
-        It prev = min;
-        if( prev < it )
-            return;
-        while( !min.compare_exchange_weak(prev, it) )
-            if( prev < it )
-                return;
-        min_chunk = chunk;
+        It prev_it = min;
+        while( prev_it > it && !min.compare_exchange_weak(prev_it, it) )
+            ;
+
+        size_t prev_chunk = min_chunk;
+        while( prev_chunk > chunk && !min_chunk.compare_exchange_weak(prev_chunk, chunk) )
+            ;
     }
 };
 
