@@ -25,6 +25,9 @@ inline constexpr bool is_random_iterator_v =
 template <class It>
 using iterator_value_t = typename std::iterator_traits<It>::value_type;
 
+template <class It>
+using iterator_diff_t = typename std::iterator_traits<It>::difference_type;
+
 template <class T>
 inline constexpr bool can_be_atomic_v = std::conjunction_v<std::is_trivially_copyable<T>,
                                                            std::is_copy_constructible<T>,
@@ -505,10 +508,9 @@ namespace internal {
 
 template <class It, class Pred>
 struct Count : Dispatchable<Count<It, Pred>> {
-    using Diff = typename std::iterator_traits<It>::difference_type;
     Partition<It> m_partition;
     Pred m_pred;
-    std::atomic<Diff> m_result{};
+    std::atomic<iterator_diff_t<It>> m_result{};
 
     Count(size_t count, size_t chunks, It first, Pred pred)
         : m_partition(first, count, chunks), m_pred(pred)
@@ -546,7 +548,7 @@ typename std::iterator_traits<FwdIt>::difference_type
 count(FwdIt first, FwdIt last, const T &value) noexcept
 {
     return ::pstld::count_if(
-        first, last, [&value](auto &iter_value) { return iter_value == value; });
+        first, last, [&value](const auto &iter_value) { return iter_value == value; });
 }
 
 namespace internal {
@@ -595,20 +597,20 @@ template <class FwdIt, class T>
 FwdIt find(FwdIt first, FwdIt last, const T &value) noexcept
 {
     return ::pstld::find_if(
-        first, last, [&value](auto &iter_value) { return iter_value == value; });
+        first, last, [&value](const auto &iter_value) { return iter_value == value; });
 }
 
 template <class FwdIt, class Pred>
 FwdIt find_if_not(FwdIt first, FwdIt last, Pred pred) noexcept
 {
     return ::pstld::find_if(
-        first, last, [&pred](auto &value) { return !static_cast<bool>(pred(value)); });
+        first, last, [&pred](const auto &value) { return !static_cast<bool>(pred(value)); });
 }
 
 template <class FwdIt1, class FwdIt2>
 FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
-    return ::pstld::find_if(first1, last1, [first2, last2](auto &value) {
+    return ::pstld::find_if(first1, last1, [first2, last2](const auto &value) {
         return std::find(first2, last2, value) != last2;
     });
 }
@@ -616,8 +618,8 @@ FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) n
 template <class FwdIt1, class FwdIt2, class Pred>
 FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred pred) noexcept
 {
-    return ::pstld::find_if(first1, last1, [first2, last2, &pred](auto &value1) {
-        return std::find_if(first2, last2, [&value1, &pred](auto &value2) {
+    return ::pstld::find_if(first1, last1, [first2, last2, &pred](const auto &value1) {
+        return std::find_if(first2, last2, [&value1, &pred](const auto &value2) {
                    return static_cast<bool>(pred(value1, value2));
                }) != last2;
     });
@@ -675,7 +677,77 @@ FwdIt adjacent_find(FwdIt first, FwdIt last, Pred pred) noexcept
 template <class FwdIt>
 FwdIt adjacent_find(FwdIt first, FwdIt last) noexcept
 {
-    return ::pstld::adjacent_find(first, last, [](auto &v1, auto &v2) { return v1 == v2; });
+    return ::pstld::adjacent_find(
+        first, last, [](const auto &v1, const auto &v2) { return v1 == v2; });
+}
+
+namespace internal {
+
+template <class It1, class It2, class Pred>
+struct Search : Dispatchable<Search<It1, It2, Pred>> {
+    Partition<It1> m_partition;
+    MinIteratorResult<It1> m_result;
+    Pred m_pred;
+    It2 m_first2;
+    It2 m_last2;
+
+    Search(size_t count, size_t chunks, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred)
+        : m_partition(first1, count, chunks), m_result{last1}, m_pred(pred), m_first2(first2),
+          m_last2(last2)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( ind < m_result.min_chunk ) {
+            for( auto p = m_partition.at(ind); p.first != p.last; ++p.first ) {
+                auto i1 = p.first;
+                auto i2 = m_first2;
+                for( ;; ++i1, ++i2 ) {
+                    if( i2 == m_last2 ) {
+                        m_result.put(ind, p.first);
+                        return;
+                    }
+                    if( !m_pred(*i1, *i2) )
+                        break;
+                }
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class Pred>
+FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred pred) noexcept
+{
+    if( first1 == last1 || first2 == last2 )
+        return first1;
+
+    const auto count1 = std::distance(first1, last1);
+    const auto count2 = std::distance(first2, last2);
+    if( count1 < count2 )
+        return last1;
+    if( count1 == count2 )
+        return std::equal(first1, last1, first2, last2, pred) ? first1 : last1;
+
+    const auto count = count1 - count2 + 1;
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    try {
+        internal::Search<FwdIt1, FwdIt2, Pred> op{
+            static_cast<size_t>(count), chunks, first1, last1, first2, last2, pred};
+        internal::dispatch_apply(chunks, &op, op.dispatch);
+        return op.m_result.min;
+    } catch( const internal::parallelism_exception & ) {
+    }
+    return std::search(first1, last1, first2, last2, pred);
+}
+
+template <class FwdIt1, class FwdIt2>
+FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+{
+    return ::pstld::search(
+        first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 
 } // namespace pstld

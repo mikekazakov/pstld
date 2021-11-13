@@ -12,22 +12,22 @@ namespace execution {
 class sequenced_policy
 {
 public:
-    static constexpr bool __enabled = false;
+    static constexpr bool __pstld_enabled = false;
 };
 class parallel_policy
 {
 public:
-    static constexpr bool __enabled = true;
+    static constexpr bool __pstld_enabled = true;
 };
 class parallel_unsequenced_policy
 {
 public:
-    static constexpr bool __enabled = true;
+    static constexpr bool __pstld_enabled = true;
 };
 class unsequenced_policy
 {
 public:
-    static constexpr bool __enabled = false;
+    static constexpr bool __pstld_enabled = false;
 };
 
 inline constexpr sequenced_policy seq;
@@ -52,11 +52,14 @@ struct is_execution_policy<unsequenced_policy> : std::true_type {
 };
 
 template <class T>
-constexpr bool is_execution_policy_v = is_execution_policy<T>::value;
+inline constexpr bool is_execution_policy_v = is_execution_policy<T>::value;
 
 template <class ExPo, class T>
 using __enable_if_execution_policy =
     typename std::enable_if<is_execution_policy<typename std::decay<ExPo>::type>::value, T>::type;
+
+template <class ExPo>
+inline constexpr bool __pstld_enabled = std::remove_reference_t<ExPo>::__pstld_enabled;
 
 } // namespace execution
 
@@ -66,7 +69,7 @@ template <class ExPo, class It, class UnPred>
 execution::__enable_if_execution_policy<ExPo, bool>
 all_of(ExPo &&, It first, It last, UnPred p) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::all_of(first, last, p);
     else
         return ::std::all_of(first, last, p);
@@ -78,7 +81,7 @@ template <class ExPo, class It, class UnPred>
 execution::__enable_if_execution_policy<ExPo, bool>
 any_of(ExPo &&, It first, It last, UnPred p) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::any_of(first, last, p);
     else
         return ::std::any_of(first, last, p);
@@ -90,7 +93,7 @@ template <class ExPo, class It, class UnPred>
 execution::__enable_if_execution_policy<ExPo, bool>
 none_of(ExPo &&, It first, It last, UnPred p) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::none_of(first, last, p);
     else
         return ::std::none_of(first, last, p);
@@ -102,7 +105,7 @@ template <class ExPo, class It, class Func>
 execution::__enable_if_execution_policy<ExPo, void>
 for_each(ExPo &&, It first, It last, Func f) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         ::pstld::for_each(first, last, f);
     else
         ::std::for_each(first, last, f);
@@ -112,7 +115,7 @@ template <class ExPo, class It, class Size, class Func>
 execution::__enable_if_execution_policy<ExPo, void>
 for_each_n(ExPo &&, It first, Size count, Func f) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         ::pstld::for_each_n(first, count, f);
     else
         ::std::for_each_n(first, count, f);
@@ -124,7 +127,7 @@ template <class ExPo, class It, class T>
 execution::__enable_if_execution_policy<ExPo, It>
 find(ExPo &&, It first, It last, const T &value) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find(first, last, value);
     else
         return ::std::find(first, last, value);
@@ -134,7 +137,7 @@ template <class ExPo, class It, class Pred>
 execution::__enable_if_execution_policy<ExPo, It>
 find_if(ExPo &&, It first, It last, Pred pred) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_if(first, last, pred);
     else
         return ::std::find_if(first, last, pred);
@@ -144,10 +147,28 @@ template <class ExPo, class It, class Pred>
 execution::__enable_if_execution_policy<ExPo, It>
 find_if_not(ExPo &&, It first, It last, Pred pred) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_if_not(first, last, pred);
     else
         return ::std::find_if_not(first, last, pred);
+}
+
+// 25.6.6 - find_end ///////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It1>
+find_end(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2)
+{
+    // Stub only
+    return ::std::find_end(first1, last1, first2, last2);
+}
+
+template <class ExPo, class It1, class It2, class Pred>
+execution::__enable_if_execution_policy<ExPo, It1>
+find_end(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred)
+{
+    // Stub only
+    return ::std::find_end(first1, last1, first2, last2, pred);
 }
 
 // 25.6.7 - find_first_of //////////////////////////////////////////////////////////////////////////
@@ -156,7 +177,7 @@ template <class ExPo, class It1, class It2>
 execution::__enable_if_execution_policy<ExPo, It1>
 find_first_of(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_first_of(first1, last1, first2, last2);
     else
         return ::std::find_first_of(first1, last1, first2, last2);
@@ -166,7 +187,7 @@ template <class ExPo, class It1, class It2, class Pred>
 execution::__enable_if_execution_policy<ExPo, It1>
 find_first_of(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_first_of(first1, last1, first2, last2, pred);
     else
         return ::std::find_first_of(first1, last1, first2, last2, pred);
@@ -177,7 +198,7 @@ find_first_of(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) 
 template <class ExPo, class It>
 execution::__enable_if_execution_policy<ExPo, It> adjacent_find(ExPo &&, It first, It last) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::adjacent_find(first, last);
     else
         return ::std::adjacent_find(first, last);
@@ -187,7 +208,7 @@ template <class ExPo, class It, class Pred>
 execution::__enable_if_execution_policy<ExPo, It>
 adjacent_find(ExPo &&, It first, It last, Pred pred) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::adjacent_find(first, last, pred);
     else
         return ::std::adjacent_find(first, last, pred);
@@ -199,7 +220,7 @@ template <class ExPo, class It, class T>
 execution::__enable_if_execution_policy<ExPo, typename std::iterator_traits<It>::difference_type>
 count(ExPo &&, It first, It last, const T &value) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::count(first, last, value);
     else
         return ::std::count(first, last, value);
@@ -209,10 +230,32 @@ template <class ExPo, class It, class Pred>
 execution::__enable_if_execution_policy<ExPo, typename std::iterator_traits<It>::difference_type>
 count_if(ExPo &&, It first, It last, Pred pred) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::count_if(first, last, pred);
     else
         return ::std::count_if(first, last, pred);
+}
+
+// 25.6.13 - search ////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It1>
+search(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::search(first1, last1, first2, last2);
+    else
+        return ::std::search(first1, last1, first2, last2);
+}
+
+template <class ExPo, class It1, class It2, class Pred>
+execution::__enable_if_execution_policy<ExPo, It1>
+search(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::search(first1, last1, first2, last2, pred);
+    else
+        return ::std::search(first1, last1, first2, last2, pred);
 }
 
 // 25.10.4 - reduce ////////////////////////////////////////////////////////////////////////////////
@@ -221,7 +264,7 @@ template <class ExPo, class It>
 execution::__enable_if_execution_policy<ExPo, typename iterator_traits<It>::value_type>
 reduce(ExPo &&, It first, It last) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::reduce(first, last);
     else
         return ::std::reduce(first, last);
@@ -230,7 +273,7 @@ reduce(ExPo &&, It first, It last) noexcept
 template <class ExPo, class It, class T>
 execution::__enable_if_execution_policy<ExPo, T> reduce(ExPo &&, It first, It last, T val) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::reduce(first, last, val);
     else
         return ::std::reduce(first, last, val);
@@ -240,7 +283,7 @@ template <class ExPo, class It, class T, class BinOp>
 execution::__enable_if_execution_policy<ExPo, T>
 reduce(ExPo &&, It first, It last, T val, BinOp op) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::reduce(first, last, val, op);
     else
         return ::std::reduce(first, last, val, op);
@@ -252,7 +295,7 @@ template <class ExPo, class It1, class It2, class T>
 execution::__enable_if_execution_policy<ExPo, T>
 transform_reduce(ExPo &&, It1 first1, It1 last1, It2 first2, T val) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::transform_reduce(first1, last1, first2, val);
     else
         return ::std::transform_reduce(first1, last1, first2, val);
@@ -267,7 +310,7 @@ execution::__enable_if_execution_policy<ExPo, T> transform_reduce(ExPo &&,
                                                                   BinRedOp redop,
                                                                   BinTrOp trop) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::transform_reduce(first1, last1, first2, val, redop, trop);
     else
         return ::std::transform_reduce(first1, last1, first2, val, redop, trop);
@@ -277,7 +320,7 @@ template <class ExPo, class It, class T, class BinOp, class UnOp>
 execution::__enable_if_execution_policy<ExPo, T>
 transform_reduce(ExPo &&, It first, It last, T val, BinOp bop, UnOp uop) noexcept
 {
-    if constexpr( remove_reference_t<ExPo>::__enabled )
+    if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::transform_reduce(first, last, val, bop, uop);
     else
         return ::std::transform_reduce(first, last, val, bop, uop);
