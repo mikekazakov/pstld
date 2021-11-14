@@ -15,26 +15,26 @@ jobs:
         mkdir build-release
         cd build-release
         cmake -DCMAKE_BUILD_TYPE=Release ..
-        make -j pstld-build-llvm-tests
+        make -j all pstld-build-llvm-tests
         make test
     - name: Build and run unit tests (Debug)
       run: |
         mkdir build-debug
         cd build-debug
         cmake -DCMAKE_BUILD_TYPE=Debug ..
-        make -j pstld-build-llvm-tests
+        make -j all pstld-build-llvm-tests
         make test
     - name: Build and run unit tests (ASAN)
       run: |
         mkdir build-asan
         cd build-asan
         cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -fsanitize=address" ..
-        make -j pstld-build-llvm-tests
+        make -j all pstld-build-llvm-tests
         make test
     - name: Build and run unit tests (UBSAN)
       run: |
         mkdir build-ubsan
         cd build-ubsan
         cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -fsanitize=undefined" ..
-        make -j pstld-build-llvm-tests
+        make -j all pstld-build-llvm-tests
         make test
