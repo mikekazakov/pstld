@@ -159,16 +159,20 @@ template <class ExPo, class It1, class It2>
 execution::__enable_if_execution_policy<ExPo, It1>
 find_end(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2)
 {
-    // Stub only
-    return ::std::find_end(first1, last1, first2, last2);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::find_end(first1, last1, first2, last2);
+    else
+        return ::std::find_end(first1, last1, first2, last2);
 }
 
 template <class ExPo, class It1, class It2, class Pred>
 execution::__enable_if_execution_policy<ExPo, It1>
 find_end(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred)
 {
-    // Stub only
-    return ::std::find_end(first1, last1, first2, last2, pred);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::find_end(first1, last1, first2, last2, pred);
+    else
+        return ::std::find_end(first1, last1, first2, last2, pred);
 }
 
 // 25.6.7 - find_first_of //////////////////////////////////////////////////////////////////////////

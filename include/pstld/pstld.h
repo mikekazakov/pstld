@@ -6,6 +6,7 @@
 #include <vector>
 #include <limits>
 #include <mutex>
+#include <cstddef>
 
 namespace pstld {
 
@@ -21,6 +22,10 @@ using iterator_category_t = typename std::iterator_traits<It>::iterator_category
 template <class It>
 inline constexpr bool is_random_iterator_v =
     std::is_convertible_v<iterator_category_t<It>, std::random_access_iterator_tag>;
+
+template <class It>
+inline constexpr bool is_bidirectional_iterator_v =
+    std::is_convertible_v<iterator_category_t<It>, std::bidirectional_iterator_tag>;
 
 template <class It>
 using iterator_value_t = typename std::iterator_traits<It>::value_type;
@@ -225,9 +230,61 @@ struct MinIteratorResult<It, false> {
             min = it;
     }
 };
+
+template <class It, bool = is_random_iterator_v<It> &&can_be_atomic_v<It>>
+struct MaxIteratorResult;
+
+template <class It>
+struct MaxIteratorResult<It, true> {
+    std::atomic<size_t> max_chunk;
+    std::atomic<It> max;
+    It last;
+
+    MaxIteratorResult(It last)
+        : max_chunk{std::numeric_limits<size_t>::max()}, max{last}, last(last)
+    {
+    }
+
+    void put(size_t chunk, It it)
+    {
+        It prev_it = last;
+        if( !max.compare_exchange_weak(prev_it, it) ) {
+            while( prev_it < it && !max.compare_exchange_weak(prev_it, it) )
+                ;
+        }
+
+        size_t prev_chunk = max_chunk;
+        while( static_cast<ptrdiff_t>(prev_chunk) < static_cast<ptrdiff_t>(chunk) &&
+               !max_chunk.compare_exchange_weak(prev_chunk, chunk) )
+            ;
+    }
+};
+
+template <class It>
+struct MaxIteratorResult<It, false> {
+    std::atomic<size_t> max_chunk;
+    It max;
+    std::mutex mutex;
+
+    MaxIteratorResult(It last) : max_chunk{std::numeric_limits<size_t>::max()}, max{last} {}
+
+    void put(size_t chunk, It it)
+    {
+        size_t prev = std::numeric_limits<size_t>::max();
+        while( !max_chunk.compare_exchange_weak(prev, chunk) )
+            if( prev > chunk )
+                return;
+
+        std::lock_guard lock{mutex};
+        if( max_chunk == chunk )
+            max = it;
+    }
+};
+
 template <class T>
 struct Dispatchable {
     static void dispatch(void *ctx, size_t ind) noexcept { static_cast<T *>(ctx)->run(ind); }
+    void dispatch_apply(size_t count) noexcept { internal::dispatch_apply(count, this, dispatch); }
 };
 
 } // namespace internal
@@ -274,7 +331,7 @@ T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transfo
         try {
             internal::TransformReduce<FwdIt, T, BinOp, UnOp> op{
                 static_cast<size_t>(count), chunks, first, reduce_op, transform_op};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
         } catch( const internal::parallelism_exception & ) {
         }
@@ -357,7 +414,7 @@ T transform_reduce(FwdIt1 first1,
         try {
             internal::TransformReduce2<FwdIt1, FwdIt2, T, BinRedOp, BinTrOp> op{
                 static_cast<size_t>(count), chunks, first1, first2, reduce_op, transform_op};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
         } catch( const internal::parallelism_exception & ) {
         }
@@ -410,7 +467,7 @@ bool all_of(FwdIt first, FwdIt last, UnPred pred) noexcept
         try {
             internal::AllOf<FwdIt, UnPred, true, true> op{
                 static_cast<size_t>(count), chunks, first, pred};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -427,7 +484,7 @@ bool none_of(FwdIt first, FwdIt last, UnPred pred) noexcept
         try {
             internal::AllOf<FwdIt, UnPred, false, true> op{
                 static_cast<size_t>(count), chunks, first, pred};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -444,7 +501,7 @@ bool any_of(FwdIt first, FwdIt last, UnPred pred) noexcept
         try {
             internal::AllOf<FwdIt, UnPred, false, false> op{
                 static_cast<size_t>(count), chunks, first, pred};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -481,7 +538,7 @@ void for_each(FwdIt first, FwdIt last, Func func) noexcept
     if( chunks > 1 ) {
         try {
             internal::ForEach<FwdIt, Func> op{static_cast<size_t>(count), chunks, first, func};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -496,7 +553,7 @@ void for_each_n(FwdIt first, Size count, Func func) noexcept
     if( chunks > 1 ) {
         try {
             internal::ForEach<FwdIt, Func> op{static_cast<size_t>(count), chunks, first, func};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -535,7 +592,7 @@ count_if(FwdIt first, FwdIt last, Pred pred) noexcept
     if( chunks > 1 ) {
         try {
             internal::Count<FwdIt, Pred> op{static_cast<size_t>(count), chunks, first, pred};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -585,7 +642,7 @@ FwdIt find_if(FwdIt first, FwdIt last, Pred pred) noexcept
     if( chunks > 1 ) {
         try {
             internal::Find<FwdIt, Pred> op{static_cast<size_t>(count), chunks, first, last, pred};
-            internal::dispatch_apply(chunks, &op, op.dispatch);
+            op.dispatch_apply(chunks);
             return op.m_result.min;
         } catch( const internal::parallelism_exception & ) {
         }
@@ -665,7 +722,7 @@ FwdIt adjacent_find(FwdIt first, FwdIt last, Pred pred) noexcept
             try {
                 internal::AdjacentFind<FwdIt, Pred> op{
                     static_cast<size_t>(count - 1), chunks, first, last, pred};
-                internal::dispatch_apply(chunks, &op, op.dispatch);
+                op.dispatch_apply(chunks);
                 return op.m_result.min;
             } catch( const internal::parallelism_exception & ) {
             }
@@ -736,7 +793,7 @@ FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred pre
     try {
         internal::Search<FwdIt1, FwdIt2, Pred> op{
             static_cast<size_t>(count), chunks, first1, last1, first2, last2, pred};
-        internal::dispatch_apply(chunks, &op, op.dispatch);
+        op.dispatch_apply(chunks);
         return op.m_result.min;
     } catch( const internal::parallelism_exception & ) {
     }
@@ -747,6 +804,99 @@ template <class FwdIt1, class FwdIt2>
 FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
     return ::pstld::search(
+        first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
+}
+
+namespace internal {
+
+template <class It1, class It2, class Pred>
+struct FindEnd : Dispatchable<FindEnd<It1, It2, Pred>> {
+    Partition<It1> m_partition;
+    MaxIteratorResult<It1> m_result;
+    Pred m_pred;
+    It2 m_first2;
+    It2 m_last2;
+
+    FindEnd(size_t count, size_t chunks, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred)
+        : m_partition(first1, count, chunks), m_result{last1}, m_pred(pred), m_first2(first2),
+          m_last2(last2)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( static_cast<ptrdiff_t>(ind) < static_cast<ptrdiff_t>(m_result.max_chunk) )
+            return;
+
+        auto p = m_partition.at(ind);
+        if constexpr( is_bidirectional_iterator_v<It1> ) {
+            do {
+                --p.last;
+                auto i1 = p.last;
+                auto i2 = m_first2;
+                for( ;; ++i1, ++i2 ) {
+                    if( i2 == m_last2 ) {
+                        m_result.put(ind, p.last);
+                        return;
+                    }
+                    if( !m_pred(*i1, *i2) )
+                        break;
+                }
+            } while( p.first != p.last );
+        }
+        else {
+            auto result = p.last;
+            for( ; p.first != p.last; ++p.first ) {
+                auto i1 = p.first;
+                auto i2 = m_first2;
+                for( ;; ++i1, ++i2 ) {
+                    if( i2 == m_last2 ) {
+                        result = p.first;
+                        break;
+                    }
+                    if( !m_pred(*i1, *i2) )
+                        break;
+                }
+            }
+            if( result != p.last )
+                m_result.put(ind, result);
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class Pred>
+FwdIt1 find_end(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred pred) noexcept
+{
+    if( first1 == last1 )
+        return first1;
+    if( first2 == last2 )
+        return last1;
+
+    const auto count1 = std::distance(first1, last1);
+    const auto count2 = std::distance(first2, last2);
+    if( count1 < count2 )
+        return last1;
+    if( count1 == count2 )
+        return std::equal(first1, last1, first2, last2, pred) ? first1 : last1;
+
+    const auto count = count1 - count2 + 1;
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    try {
+        internal::FindEnd<FwdIt1, FwdIt2, Pred> op{
+            static_cast<size_t>(count), chunks, first1, last1, first2, last2, pred};
+        op.dispatch_apply(chunks);
+        return op.m_result.max;
+    } catch( const internal::parallelism_exception & ) {
+    }
+    return std::find_end(first1, last1, first2, last2, pred);
+}
+
+template <class FwdIt1, class FwdIt2>
+FwdIt1 find_end(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+{
+    return ::pstld::find_end(
         first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 

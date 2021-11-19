@@ -1,3 +1,4 @@
+// Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #include <cstddef>
 #include <cstdio>
 #include <algorithm>
@@ -153,6 +154,17 @@ struct search {
 };
 
 template <class ExPo>
+struct find_end {
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2{42., 42., 42., 43.};
+        return measure(
+            [&] { v1 = std::vector<double>(size, 42.); },
+            [&] { noopt(std::find_end(ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end())); });
+    }
+};
+
+template <class ExPo>
 struct reduce {
     auto operator()(size_t size)
     {
@@ -223,6 +235,7 @@ int main()
     results.emplace_back(record<benchmarks::adjacent_find>());
     results.emplace_back(record<benchmarks::count>());
     results.emplace_back(record<benchmarks::search>());
+    results.emplace_back(record<benchmarks::find_end>());
     results.emplace_back(record<benchmarks::reduce>());
     results.emplace_back(record<benchmarks::transform_reduce>());
 
