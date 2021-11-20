@@ -112,13 +112,13 @@ for_each(ExPo &&, It first, It last, Func f) noexcept
 }
 
 template <class ExPo, class It, class Size, class Func>
-execution::__enable_if_execution_policy<ExPo, void>
+execution::__enable_if_execution_policy<ExPo, It>
 for_each_n(ExPo &&, It first, Size count, Func f) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        ::pstld::for_each_n(first, count, f);
+        return ::pstld::for_each_n(first, count, f);
     else
-        ::std::for_each_n(first, count, f);
+        return ::std::for_each_n(first, count, f);
 }
 
 // 25.6.5 - find, find_if, find_if_not /////////////////////////////////////////////////////////////

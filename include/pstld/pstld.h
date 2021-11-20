@@ -137,8 +137,9 @@ struct Partition<It, true> {
     It base;
     size_t fraction;
     size_t leftover;
+    size_t count;
     Partition(It first, size_t count, size_t chunks)
-        : base(first), fraction(count / chunks), leftover(count % chunks)
+        : base(first), fraction(count / chunks), leftover(count % chunks), count(count)
     {
     }
 
@@ -162,6 +163,11 @@ struct Partition<It, true> {
             const auto last = first + fraction;
             return {first, last};
         }
+    }
+    
+    It end()
+    {
+        return base + count;
     }
 };
 
@@ -187,6 +193,11 @@ struct Partition<It, false> {
     }
 
     ItRange<It> at(size_t chunk_no) { return segments[chunk_no]; }
+    
+    It end()
+    {
+        return segments.back().last;
+    }
 };
 
 template <class It, bool = is_random_iterator_v<It> &&can_be_atomic_v<It>>
@@ -545,18 +556,18 @@ void for_each(FwdIt first, FwdIt last, Func func) noexcept
 }
 
 template <class FwdIt, class Size, class Func>
-void for_each_n(FwdIt first, Size count, Func func) noexcept
+FwdIt for_each_n(FwdIt first, Size count, Func func) noexcept
 {
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
             internal::ForEach<FwdIt, Func> op{static_cast<size_t>(count), chunks, first, func};
             op.dispatch_apply(chunks);
-            return;
+            return op.m_partition.end();
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    std::for_each_n(first, count, func);
+    return std::for_each_n(first, count, func);
 }
 
 namespace internal {
