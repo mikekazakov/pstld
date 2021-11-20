@@ -10,6 +10,7 @@ jobs:
     - name: Download LLVM-PSTL unit tests
       run: |
         cd test-llvm-pstl && ./bootstrap.sh
+        cd test-msvc-stl && ./bootstrap.sh
     - name: Build and run unit tests (Release)
       run: |
         mkdir build-release
