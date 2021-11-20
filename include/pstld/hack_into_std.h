@@ -278,9 +278,9 @@ template <class ExPo, class It, class T>
 execution::__enable_if_execution_policy<ExPo, T> reduce(ExPo &&, It first, It last, T val) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::reduce(first, last, val);
+        return ::pstld::reduce(first, last, std::move(val));
     else
-        return ::std::reduce(first, last, val);
+        return ::pstld::internal::move_reduce(first, last, std::move(val), std::plus<>{});
 }
 
 template <class ExPo, class It, class T, class BinOp>
@@ -288,9 +288,9 @@ execution::__enable_if_execution_policy<ExPo, T>
 reduce(ExPo &&, It first, It last, T val, BinOp op) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::reduce(first, last, val, op);
+        return ::pstld::reduce(first, last, std::move(val), op);
     else
-        return ::std::reduce(first, last, val, op);
+        return ::pstld::internal::move_reduce(first, last, std::move(val), op);
 }
 
 // 25.10.6 - transform_reduce //////////////////////////////////////////////////////////////////////
@@ -300,9 +300,10 @@ execution::__enable_if_execution_policy<ExPo, T>
 transform_reduce(ExPo &&, It1 first1, It1 last1, It2 first2, T val) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::transform_reduce(first1, last1, first2, val);
+        return ::pstld::transform_reduce(first1, last1, first2, std::move(val));
     else
-        return ::std::transform_reduce(first1, last1, first2, val);
+        return ::pstld::internal::move_transform_reduce(
+            first1, last1, first2, std::move(val), std::plus<>{}, std::multiplies<>{});
 }
 
 template <class ExPo, class It1, class It2, class T, class BinRedOp, class BinTrOp>
@@ -315,9 +316,10 @@ execution::__enable_if_execution_policy<ExPo, T> transform_reduce(ExPo &&,
                                                                   BinTrOp trop) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::transform_reduce(first1, last1, first2, val, redop, trop);
+        return ::pstld::transform_reduce(first1, last1, first2, std::move(val), redop, trop);
     else
-        return ::std::transform_reduce(first1, last1, first2, val, redop, trop);
+        return ::pstld::internal::move_transform_reduce(
+            first1, last1, first2, std::move(val), redop, trop);
 }
 
 template <class ExPo, class It, class T, class BinOp, class UnOp>
@@ -325,9 +327,9 @@ execution::__enable_if_execution_policy<ExPo, T>
 transform_reduce(ExPo &&, It first, It last, T val, BinOp bop, UnOp uop) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::transform_reduce(first, last, val, bop, uop);
+        return ::pstld::transform_reduce(first, last, std::move(val), bop, uop);
     else
-        return ::std::transform_reduce(first, last, val, bop, uop);
+        return ::pstld::internal::move_transform_reduce(first, last, std::move(val), bop, uop);
 }
 
 } // namespace std

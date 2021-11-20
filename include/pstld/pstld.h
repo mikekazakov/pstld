@@ -164,11 +164,8 @@ struct Partition<It, true> {
             return {first, last};
         }
     }
-    
-    It end()
-    {
-        return base + count;
-    }
+
+    It end() { return base + count; }
 };
 
 template <class It>
@@ -193,11 +190,8 @@ struct Partition<It, false> {
     }
 
     ItRange<It> at(size_t chunk_no) { return segments[chunk_no]; }
-    
-    It end()
-    {
-        return segments.back().last;
-    }
+
+    It end() { return segments.back().last; }
 };
 
 template <class It, bool = is_random_iterator_v<It> &&can_be_atomic_v<It>>
@@ -329,6 +323,22 @@ struct TransformReduce : Dispatchable<TransformReduce<It, T, BinOp, UnOp>> {
     }
 };
 
+template <class It, class T, class BinOp>
+T move_reduce(It first, It last, T val, BinOp reduce)
+{
+    for( ; first != last; ++first )
+        val = reduce(std::move(val), std::move(*first));
+    return val;
+}
+
+template <class It, class T, class BinOp, class UnOp>
+T move_transform_reduce(It first, It last, T val, BinOp reduce, UnOp transform)
+{
+    for( ; first != last; ++first )
+        val = reduce(std::move(val), transform(std::move(*first)));
+    return val;
+}
+
 } // namespace internal
 
 template <class FwdIt, class T, class BinOp, class UnOp>
@@ -341,12 +351,12 @@ T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transfo
             internal::TransformReduce<FwdIt, T, BinOp, UnOp> op{
                 static_cast<size_t>(count), chunks, first, reduce_op, transform_op};
             op.dispatch_apply(chunks);
-            return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
+            return internal::move_reduce(
+                op.m_results.begin(), op.m_results.end(), std::move(val), reduce_op);
         } catch( const internal::parallelism_exception & ) {
         }
     }
-
-    return std::transform_reduce(first, last, val, reduce_op, transform_op);
+    return internal::move_transform_reduce(first, last, std::move(val), reduce_op, transform_op);
 }
 
 template <class It>
@@ -359,13 +369,14 @@ internal::iterator_value_t<It> reduce(It first, It last) noexcept
 template <class It, class T>
 T reduce(It first, It last, T val) noexcept
 {
-    return ::pstld::transform_reduce(first, last, val, std::plus<>{}, ::pstld::internal::no_op{});
+    return ::pstld::transform_reduce(
+        first, last, std::move(val), std::plus<>{}, ::pstld::internal::no_op{});
 }
 
 template <class It, class T, class BinOp>
 T reduce(It first, It last, T val, BinOp op) noexcept
 {
-    return ::pstld::transform_reduce(first, last, val, op, ::pstld::internal::no_op{});
+    return ::pstld::transform_reduce(first, last, std::move(val), op, ::pstld::internal::no_op{});
 }
 
 namespace internal {
@@ -407,6 +418,14 @@ struct TransformReduce2 : Dispatchable<TransformReduce2<It1, It2, T, BinRedOp, B
     }
 };
 
+template <class It1, class It2, class T, class BinOp, class UnOp>
+T move_transform_reduce(It1 first1, It1 last1, It2 first2, T val, BinOp reduce, UnOp transform)
+{
+    for( ; first1 != last1; ++first1, ++first2 )
+        val = reduce(std::move(val), transform(std::move(*first1), std::move(*first2)));
+    return val;
+}
+
 } // namespace internal
 
 template <class FwdIt1, class FwdIt2, class T, class BinRedOp, class BinTrOp>
@@ -424,18 +443,20 @@ T transform_reduce(FwdIt1 first1,
             internal::TransformReduce2<FwdIt1, FwdIt2, T, BinRedOp, BinTrOp> op{
                 static_cast<size_t>(count), chunks, first1, first2, reduce_op, transform_op};
             op.dispatch_apply(chunks);
-            return std::reduce(op.m_results.begin(), op.m_results.end(), val, reduce_op);
+            return internal::move_reduce(
+                op.m_results.begin(), op.m_results.end(), std::move(val), reduce_op);
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    return std::transform_reduce(first1, last1, first2, val, reduce_op, transform_op);
+    return internal::move_transform_reduce(
+        first1, last1, first2, std::move(val), reduce_op, transform_op);
 }
 
 template <class It1, class It2, class T>
 T transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
 {
     return ::pstld::transform_reduce(
-        first1, last1, first2, val, std::plus<>{}, std::multiplies<>{});
+        first1, last1, first2, std::move(val), std::plus<>{}, std::multiplies<>{});
 }
 
 namespace internal {
