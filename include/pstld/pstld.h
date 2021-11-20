@@ -930,4 +930,116 @@ FwdIt1 find_end(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexce
         first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 
+namespace internal {
+
+template <class It, class Cmp>
+struct IsSorted : Dispatchable<IsSorted<It, Cmp>> {
+    Partition<It> m_partition;
+    Cmp m_cmp;
+    std::atomic_bool m_done{false};
+    bool m_result = true;
+
+    IsSorted(size_t count, size_t chunks, It first, It last, Cmp cmp)
+        : m_partition(first, count, chunks), m_cmp(cmp)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( m_done == false ) {
+            auto p = m_partition.at(ind);
+            for( auto it1 = p.first, it2 = p.first; it1 != p.last; it1 = it2 ) {
+                ++it2;
+                if( m_cmp(*it2, *it1) ) {
+                    m_done = true;
+                    m_result = false;
+                    return;
+                }
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Cmp>
+bool is_sorted(FwdIt first, FwdIt last, Cmp cmp)
+{
+    const auto count = std::distance(first, last);
+    if( count > 2 ) {
+        const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
+        if( chunks > 1 ) {
+            try {
+                internal::IsSorted<FwdIt, Cmp> op{
+                    static_cast<size_t>(count - 1), chunks, first, last, cmp};
+                op.dispatch_apply(chunks);
+                return op.m_result;
+            } catch( const internal::parallelism_exception & ) {
+            }
+        }
+    }
+    return std::is_sorted(first, last, cmp);
+}
+
+template <class FwdIt>
+bool is_sorted(FwdIt first, FwdIt last)
+{
+    return ::pstld::is_sorted(first, last, std::less<>{});
+}
+
+namespace internal {
+
+template <class It, class Cmp>
+struct IsSortedUntil : Dispatchable<IsSortedUntil<It, Cmp>> {
+    Partition<It> m_partition;
+    Cmp m_cmp;
+    MinIteratorResult<It> m_result;
+
+    IsSortedUntil(size_t count, size_t chunks, It first, It last, Cmp cmp)
+        : m_partition(first, count, chunks), m_cmp(cmp), m_result(last)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( ind < m_result.min_chunk ) {
+            auto p = m_partition.at(ind);
+            for( auto it1 = p.first, it2 = p.first; it1 != p.last; it1 = it2 ) {
+                ++it2;
+                if( m_cmp(*it2, *it1) ) {
+                    m_result.put(ind, it2);
+                    return;
+                }
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Cmp>
+FwdIt is_sorted_until(FwdIt first, FwdIt last, Cmp cmp)
+{
+    const auto count = std::distance(first, last);
+    if( count > 2 ) {
+        const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
+        if( chunks > 1 ) {
+            try {
+                internal::IsSortedUntil<FwdIt, Cmp> op{
+                    static_cast<size_t>(count - 1), chunks, first, last, cmp};
+                op.dispatch_apply(chunks);
+                return op.m_result.min;
+            } catch( const internal::parallelism_exception & ) {
+            }
+        }
+    }
+    return std::is_sorted_until(first, last, cmp);
+}
+
+template <class FwdIt>
+FwdIt is_sorted_until(FwdIt first, FwdIt last)
+{
+    return ::pstld::is_sorted_until(first, last, std::less<>{});
+}
+
 } // namespace pstld

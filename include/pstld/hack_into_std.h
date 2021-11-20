@@ -262,6 +262,44 @@ search(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) noexcep
         return ::std::search(first1, last1, first2, last2, pred);
 }
 
+// 25.8.2.5 - is_sorted, is_sorted_until ///////////////////////////////////////////////////////////
+
+template <class ExPo, class It>
+bool is_sorted(ExPo &&policy, It first, It last)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::is_sorted(first, last);
+    else
+        return ::std::is_sorted(first, last);
+}
+
+template <class ExPo, class It, class Cmp>
+bool is_sorted(ExPo &&policy, It first, It last, Cmp cmp)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::is_sorted(first, last, cmp);
+    else
+        return ::std::is_sorted(first, last, cmp);
+}
+
+template <class ExPo, class It>
+It is_sorted_until(ExPo &&policy, It first, It last)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::is_sorted_until(first, last);
+    else
+        return ::std::is_sorted_until(first, last);
+}
+
+template <class ExPo, class It, class Cmp>
+It is_sorted_until(ExPo &&policy, It first, It last, Cmp cmp)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::is_sorted_until(first, last, cmp);
+    else
+        return ::std::is_sorted_until(first, last, cmp);
+}
+
 // 25.10.4 - reduce ////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It>
