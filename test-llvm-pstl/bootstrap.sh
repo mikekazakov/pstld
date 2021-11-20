@@ -7,4 +7,6 @@ git clone \
   https://github.com/llvm/llvm-project
 
 cd llvm-project
-git checkout main -- pstl
+git sparse-checkout init --cone
+git sparse-checkout add pstl
+git checkout
