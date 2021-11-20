@@ -9,7 +9,7 @@ jobs:
         submodules: 'recursive'
     - name: Download LLVM-PSTL unit tests
       run: |
-        cd test-llvm-pstl && ./bootstrap.sh
+        cd test-llvm-pstl && ./bootstrap.sh && cd -
         cd test-msvc-stl && ./bootstrap.sh
     - name: Build and run unit tests (Release)
       run: |
