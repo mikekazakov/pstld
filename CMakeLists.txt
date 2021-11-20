@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 project(pstld VERSION 1.0
               DESCRIPTION "ParallelSTL on top of GCD"
               LANGUAGES CXX)

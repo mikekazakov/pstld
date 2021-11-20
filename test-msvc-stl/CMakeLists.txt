@@ -1,11 +1,13 @@
 add_custom_target(pstld-build-msvc-tests
     COMMENT "Build all the msvc-stl tests.")
+set_target_properties(pstld-build-msvc-tests PROPERTIES FOLDER "Tests/MSVC")
 
 add_custom_target(check-pstld-msvc
     COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure
     USES_TERMINAL
     DEPENDS pstld-build-msvc-tests
     COMMENT "Build and run all the unit tests.")
+set_target_properties(check-pstld-msvc PROPERTIES FOLDER "Tests/MSVC")
 
 set(UNIT_TESTS
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_all_of/test.cpp
@@ -25,6 +27,7 @@ foreach(_file IN LISTS UNIT_TESTS)
                                                 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     set_target_properties(${_target} PROPERTIES CXX_STANDARD 17)
     set_target_properties(${_target} PROPERTIES COMPILE_FLAGS "-include${CMAKE_CURRENT_LIST_DIR}/../include/pstld/hack_into_std.h")
+    set_target_properties(${_target} PROPERTIES FOLDER "Tests/MSVC")
     add_test(${_target} "${CMAKE_CURRENT_BINARY_DIR}/${_target}")
     add_dependencies(pstld-build-msvc-tests ${_target})
 endforeach()
