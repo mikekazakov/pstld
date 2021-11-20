@@ -17,3 +17,4 @@ add_subdirectory(benchmark)
 
 enable_testing()
 add_subdirectory(test-llvm-pstl)
+add_subdirectory(test-msvc-stl)
