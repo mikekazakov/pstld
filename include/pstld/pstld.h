@@ -247,11 +247,9 @@ struct MaxIteratorResult<It, true> {
 
     void put(size_t chunk, It it)
     {
-        It prev_it = last;
-        if( !max.compare_exchange_weak(prev_it, it) ) {
-            while( prev_it < it && !max.compare_exchange_weak(prev_it, it) )
-                ;
-        }
+        It prev_it = max;
+        while( (prev_it == last || prev_it < it) && !max.compare_exchange_weak(prev_it, it) )
+            ;
 
         size_t prev_chunk = max_chunk;
         while( static_cast<ptrdiff_t>(prev_chunk) < static_cast<ptrdiff_t>(chunk) &&
