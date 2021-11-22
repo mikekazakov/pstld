@@ -1042,4 +1042,177 @@ FwdIt is_sorted_until(FwdIt first, FwdIt last)
     return ::pstld::is_sorted_until(first, last, std::less<>{});
 }
 
+namespace internal {
+
+template <class It, class Cmp>
+struct MinElement : Dispatchable<MinElement<It, Cmp>> {
+    Partition<It> m_partition;
+    unitialized_array<It> m_results;
+    Cmp m_cmp;
+
+    MinElement(size_t count, size_t chunks, It first, Cmp cmp)
+        : m_partition(first, count, chunks), m_results(chunks), m_cmp(cmp)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        m_results.put(ind, std::min_element(p.first, p.last, m_cmp));
+    }
+};
+
+template <class It, class Cmp>
+iterator_value_t<It> min_iter_element(It first, It last, Cmp cmp)
+{
+    auto smallest = *first;
+    ++first;
+    for( ; first != last; ++first ) {
+        if( cmp(*(*first), *smallest) ) {
+            smallest = *first;
+        }
+    }
+    return smallest;
+}
+
+} // namespace internal
+
+template <class FwdIt, class Cmp>
+FwdIt min_element(FwdIt first, FwdIt last, Cmp cmp)
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_2(count);
+    if( chunks > 1 ) {
+        try {
+            internal::MinElement<FwdIt, Cmp> op{static_cast<size_t>(count), chunks, first, cmp};
+            op.dispatch_apply(chunks);
+            return internal::min_iter_element(op.m_results.begin(), op.m_results.end(), cmp);
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::min_element(first, last, cmp);
+}
+
+template <class FwdIt>
+FwdIt min_element(FwdIt first, FwdIt last)
+{
+    return ::pstld::min_element(first, last, std::less<>{});
+}
+
+namespace internal {
+
+template <class It, class Cmp>
+struct MaxElement : Dispatchable<MaxElement<It, Cmp>> {
+    Partition<It> m_partition;
+    unitialized_array<It> m_results;
+    Cmp m_cmp;
+
+    MaxElement(size_t count, size_t chunks, It first, Cmp cmp)
+        : m_partition(first, count, chunks), m_results(chunks), m_cmp(cmp)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        m_results.put(ind, std::max_element(p.first, p.last, m_cmp));
+    }
+};
+
+template <class It, class Cmp>
+iterator_value_t<It> max_iter_element(It first, It last, Cmp cmp)
+{
+    auto biggest = *first;
+    ++first;
+    for( ; first != last; ++first ) {
+        if( cmp(*biggest, *(*first)) ) {
+            biggest = *first;
+        }
+    }
+    return biggest;
+}
+
+} // namespace internal
+
+template <class FwdIt, class Cmp>
+FwdIt max_element(FwdIt first, FwdIt last, Cmp cmp)
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_2(count);
+    if( chunks > 1 ) {
+        try {
+            internal::MaxElement<FwdIt, Cmp> op{static_cast<size_t>(count), chunks, first, cmp};
+            op.dispatch_apply(chunks);
+            return internal::max_iter_element(op.m_results.begin(), op.m_results.end(), cmp);
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::max_element(first, last, cmp);
+}
+
+template <class FwdIt>
+FwdIt max_element(FwdIt first, FwdIt last)
+{
+    return ::pstld::max_element(first, last, std::less<>{});
+}
+
+namespace internal {
+
+template <class It, class Cmp>
+struct MinMaxElement : Dispatchable<MinMaxElement<It, Cmp>> {
+    Partition<It> m_partition;
+    unitialized_array<std::pair<It, It>> m_results;
+    Cmp m_cmp;
+
+    MinMaxElement(size_t count, size_t chunks, It first, Cmp cmp)
+        : m_partition(first, count, chunks), m_results(chunks), m_cmp(cmp)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        m_results.put(ind, std::minmax_element(p.first, p.last, m_cmp));
+    }
+};
+
+template <class It, class Cmp>
+iterator_value_t<It> minmax_iter_element(It first, It last, Cmp cmp)
+{
+    auto smallest = (*first).first;
+    auto biggest = (*first).second;
+    ++first;
+    for( ; first != last; ++first ) {
+        if( cmp(*((*first).first), *smallest) )
+            smallest = (*first).first;
+        if( !cmp(*((*first).second), *biggest) )
+            biggest = (*first).second;
+    }
+    return {smallest, biggest};
+}
+
+} // namespace internal
+
+template <class FwdIt, class Cmp>
+std::pair<FwdIt, FwdIt> minmax_element(FwdIt first, FwdIt last, Cmp cmp)
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_2(count);
+    if( chunks > 1 ) {
+        try {
+            internal::MinMaxElement<FwdIt, Cmp> op{static_cast<size_t>(count), chunks, first, cmp};
+            op.dispatch_apply(chunks);
+            return internal::minmax_iter_element(op.m_results.begin(), op.m_results.end(), cmp);
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::minmax_element(first, last, cmp);
+}
+
+template <class FwdIt>
+std::pair<FwdIt, FwdIt> minmax_element(FwdIt first, FwdIt last)
+{
+    return ::pstld::minmax_element(first, last, std::less<>{});
+}
+
 } // namespace pstld
