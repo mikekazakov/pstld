@@ -51,6 +51,7 @@ foreach(_file IN LISTS UNIT_TESTS)
     add_executable(${_target} EXCLUDE_FROM_ALL "${_file}")
     target_include_directories(${_target} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/include")
     target_link_libraries(${_target} PRIVATE pstld)
+    target_compile_options(${_target} PRIVATE -UNDEBUG)
     set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS NO
                                                 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     set_target_properties(${_target} PROPERTIES CXX_STANDARD 17)
