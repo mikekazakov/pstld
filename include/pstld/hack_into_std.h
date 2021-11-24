@@ -240,7 +240,7 @@ count_if(ExPo &&, It first, It last, Pred pred) noexcept
         return ::std::count_if(first, last, pred);
 }
 
-// 25.6.13 - search ////////////////////////////////////////////////////////////////////////////////
+// 25.6.13 - search, search_n //////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>
 execution::__enable_if_execution_policy<ExPo, It1>
@@ -260,6 +260,26 @@ search(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred) noexcep
         return ::pstld::search(first1, last1, first2, last2, pred);
     else
         return ::std::search(first1, last1, first2, last2, pred);
+}
+
+template <class ExPo, class It, class Size, class T>
+execution::__enable_if_execution_policy<ExPo, It>
+search_n(ExPo &&, It first, It last, Size count, const T &value) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::search_n(first, last, count, value);
+    else
+        return ::std::search_n(first, last, count, value);
+}
+
+template <class ExPo, class It, class Size, class T, class Pred>
+execution::__enable_if_execution_policy<ExPo, It>
+search_n(ExPo &&, It first, It last, Size count, const T &value, Pred pred) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::search_n(first, last, count, value, pred);
+    else
+        return ::std::search_n(first, last, count, value, pred);
 }
 
 // 25.8.2.5 - is_sorted, is_sorted_until ///////////////////////////////////////////////////////////

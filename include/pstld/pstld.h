@@ -839,6 +839,80 @@ FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 
 namespace internal {
 
+template <class It, class T, class Pred>
+struct SearchN : Dispatchable<SearchN<It, T, Pred>> {
+    Partition<It> m_partition;
+    MinIteratorResult<It> m_result;
+    Pred m_pred;
+    const T &m_val;
+    size_t m_seq;
+
+    SearchN(size_t count, size_t chunks, It first, It last, Pred pred, const T &val, size_t seq)
+        : m_partition(first, count, chunks), m_result{last}, m_pred(pred), m_val(val), m_seq(seq)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( ind < m_result.min_chunk ) {
+            for( auto p = m_partition.at(ind); p.first != p.last; ++p.first ) {
+                auto it = p.first;
+                for( size_t s = 0;; ++it, ++s ) {
+                    if( s == m_seq ) {
+                        m_result.put(ind, p.first);
+                        return;
+                    }
+                    if( !m_pred(*it, m_val) )
+                        break;
+                }
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Size, class T, class Pred>
+FwdIt search_n(FwdIt first, FwdIt last, Size count2, const T &value, Pred pred) noexcept
+{
+    if( first == last )
+        return first;
+
+    if( count2 <= Size{} )
+        return first;
+
+    const auto count1 = std::distance(first, last);
+    if( count1 < count2 )
+        return last;
+    if( count1 == count2 )
+        return std::all_of(first, last, [&](const auto &v) { return pred(v, value); }) ? first
+                                                                                       : last;
+
+    const auto count = count1 - count2 + 1;
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    try {
+        internal::SearchN<FwdIt, T, Pred> op{static_cast<size_t>(count),
+                                             chunks,
+                                             first,
+                                             last,
+                                             pred,
+                                             value,
+                                             static_cast<size_t>(count2)};
+        op.dispatch_apply(chunks);
+        return op.m_result.min;
+    } catch( const internal::parallelism_exception & ) {
+    }
+    return std::search_n(first, last, count2, value, pred);
+}
+
+template <class FwdIt, class Size, class T>
+FwdIt search_n(FwdIt first, FwdIt last, Size count2, const T &value) noexcept
+{
+    return ::pstld::search_n(first, last, count2, value, std::equal_to<>{});
+}
+
+namespace internal {
+
 template <class It1, class It2, class Pred>
 struct FindEnd : Dispatchable<FindEnd<It1, It2, Pred>> {
     Partition<It1> m_partition;
