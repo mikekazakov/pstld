@@ -282,6 +282,28 @@ search_n(ExPo &&, It first, It last, Size count, const T &value, Pred pred) noex
         return ::std::search_n(first, last, count, value, pred);
 }
 
+// 25.7.4 - transform //////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2, class UnOp>
+execution::__enable_if_execution_policy<ExPo, It2>
+transform(ExPo &&, It1 first1, It1 last1, It2 first2, UnOp op) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::transform(first1, last1, first2, op);
+    else
+        return ::std::transform(first1, last1, first2, op);
+}
+
+template <class ExPo, class It1, class It2, class It3, class UnOp>
+execution::__enable_if_execution_policy<ExPo, It3>
+transform(ExPo &&, It1 first1, It1 last1, It2 first2, It3 first3, UnOp op) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::transform(first1, last1, first2, first3, op);
+    else
+        return ::std::transform(first1, last1, first2, first3, op);
+}
+
 // 25.8.2.5 - is_sorted, is_sorted_until ///////////////////////////////////////////////////////////
 
 template <class ExPo, class It>

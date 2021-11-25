@@ -1289,4 +1289,81 @@ std::pair<FwdIt, FwdIt> minmax_element(FwdIt first, FwdIt last)
     return ::pstld::minmax_element(first, last, std::less<>{});
 }
 
+namespace internal {
+
+template <class It1, class It2, class UnOp>
+struct Transform2 : Dispatchable<Transform2<It1, It2, UnOp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    UnOp m_op;
+
+    Transform2(size_t count, size_t chunks, It1 first1, It2 first2, UnOp op)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_op(op)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition1.at(ind);
+        std::transform(p.first, p.last, m_partition2.at(ind).first, m_op);
+    }
+};
+
+template <class It1, class It2, class It3, class BinOp>
+struct Transform3 : Dispatchable<Transform3<It1, It2, It3, BinOp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    Partition<It3> m_partition3;
+    BinOp m_op;
+
+    Transform3(size_t count, size_t chunks, It1 first1, It2 first2, It3 first3, BinOp op)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
+          m_partition3(first3, count, chunks), m_op(op)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition1.at(ind);
+        std::transform(
+            p.first, p.last, m_partition2.at(ind).first, m_partition3.at(ind).first, m_op);
+    }
+};
+
+} // namespace internal
+template <class FwdIt1, class FwdIt2, class UnOp>
+FwdIt2 transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, UnOp transform_op) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Transform2<FwdIt1, FwdIt2, UnOp> op{
+                static_cast<size_t>(count), chunks, first1, first2, transform_op};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::transform(first1, last1, first2, transform_op);
+}
+
+template <class FwdIt1, class FwdIt2, class FwdIt3, class BinOp>
+FwdIt3
+transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt3 first3, BinOp transform_op) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Transform3<FwdIt1, FwdIt2, FwdIt3, BinOp> op{
+                static_cast<size_t>(count), chunks, first1, first2, first3, transform_op};
+            op.dispatch_apply(chunks);
+            return op.m_partition3.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::transform(first1, last1, first2, first3, transform_op);
+}
+
 } // namespace pstld
