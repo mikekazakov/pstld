@@ -240,6 +240,48 @@ count_if(ExPo &&, It first, It last, Pred pred) noexcept
         return ::std::count_if(first, last, pred);
 }
 
+// 25.6.11 - equal /////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, bool>
+equal(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::equal(first1, last1, first2);
+    else
+        return ::std::equal(first1, last1, first2);
+}
+
+template <class ExPo, class It1, class It2, class Eq>
+execution::__enable_if_execution_policy<ExPo, bool>
+equal(ExPo &&, It1 first1, It1 last1, It2 first2, Eq eq) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::equal(first1, last1, first2, eq);
+    else
+        return ::std::equal(first1, last1, first2, eq);
+}
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, bool>
+equal(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::equal(first1, last1, first2, last2);
+    else
+        return ::std::equal(first1, last1, first2, last2);
+}
+
+template <class ExPo, class It1, class It2, class Eq>
+execution::__enable_if_execution_policy<ExPo, bool>
+equal(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Eq eq) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::equal(first1, last1, first2, last2, eq);
+    else
+        return ::std::equal(first1, last1, first2, last2, eq);
+}
+
 // 25.6.13 - search, search_n //////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>

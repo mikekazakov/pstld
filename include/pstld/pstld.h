@@ -1366,4 +1366,82 @@ transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt3 first3, BinOp trans
     return std::transform(first1, last1, first2, first3, transform_op);
 }
 
+namespace internal {
+
+template <class It1, class It2, class Cmp>
+struct Equal : Dispatchable<Equal<It1, It2, Cmp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    Cmp m_cmp;
+    std::atomic_bool m_done{false};
+    bool m_result = true;
+
+    Equal(size_t count, size_t chunks, It1 first1, It2 first2, Cmp cmp)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_cmp(cmp)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( m_done )
+            return;
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        if( !std::equal(p1.first, p1.last, p2.first, m_cmp) ) {
+            m_done = true;
+            m_result = false;
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class Cmp>
+bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, Cmp cmp) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Equal<FwdIt1, FwdIt2, Cmp> op{
+                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            op.dispatch_apply(chunks);
+            return op.m_result;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::equal(first1, last1, first2, cmp);
+}
+
+template <class FwdIt1, class FwdIt2>
+bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    return ::pstld::equal(first1, last1, first2, std::equal_to<>{});
+}
+
+template <class FwdIt1, class FwdIt2, class Cmp>
+bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    if( count != std::distance(first2, last2) )
+        return false;
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Equal<FwdIt1, FwdIt2, Cmp> op{
+                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            op.dispatch_apply(chunks);
+            return op.m_result;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::equal(first1, last1, first2, cmp);
+}
+
+template <class FwdIt1, class FwdIt2>
+bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+{
+    return ::pstld::equal(first1, last1, first2, last2, std::equal_to<>{});
+}
+
 } // namespace pstld
