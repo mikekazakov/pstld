@@ -22,6 +22,7 @@ set(UNIT_TESTS
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/find_first_of.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/find_if.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/for_each.pass.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/mismatch.pass.cpp    
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/none_of.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/search_n.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.sorting/is_sorted.pass.cpp

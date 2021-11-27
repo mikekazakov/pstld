@@ -240,6 +240,48 @@ count_if(ExPo &&, It first, It last, Pred pred) noexcept
         return ::std::count_if(first, last, pred);
 }
 
+// 25.6.10 - mismatch //////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, std::pair<It1, It2>>
+mismatch(ExPo &&policy, It1 first1, It1 last1, It2 first2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::mismatch(first1, last1, first2);
+    else
+        return ::std::mismatch(first1, last1, first2);
+}
+
+template <class ExPo, class It1, class It2, class Cmp>
+execution::__enable_if_execution_policy<ExPo, std::pair<It1, It2>>
+mismatch(ExPo &&policy, It1 first1, It1 last1, It2 first2, Cmp cmp) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::mismatch(first1, last1, first2, cmp);
+    else
+        return ::std::mismatch(first1, last1, first2, cmp);
+}
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, std::pair<It1, It2>>
+mismatch(ExPo &&policy, It1 first1, It1 last1, It2 first2, It2 last2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::mismatch(first1, last1, first2, last2);
+    else
+        return ::std::mismatch(first1, last1, first2, last2);
+}
+
+template <class ExPo, class It1, class It2, class Cmp>
+execution::__enable_if_execution_policy<ExPo, std::pair<It1, It2>>
+mismatch(ExPo &&policy, It1 first1, It1 last1, It2 first2, It2 last2, Cmp cmp) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::mismatch(first1, last1, first2, last2, cmp);
+    else
+        return ::std::mismatch(first1, last1, first2, last2, cmp);
+}
+
 // 25.6.11 - equal /////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>

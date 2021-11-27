@@ -1444,4 +1444,85 @@ bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
     return ::pstld::equal(first1, last1, first2, last2, std::equal_to<>{});
 }
 
+namespace internal {
+
+template <class It1, class It2, class Cmp>
+struct Mismatch : Dispatchable<Mismatch<It1, It2, Cmp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    Cmp m_cmp;
+    MinIteratorResult<It1> m_result1;
+    MinIteratorResult<It2> m_result2;
+
+    Mismatch(size_t count, size_t chunks, It1 first1, It2 first2, Cmp cmp)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_cmp(cmp),
+          m_result1(m_partition1.end()), m_result2(m_partition2.end())
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( ind < m_result1.min_chunk ) {
+            auto p1 = m_partition1.at(ind);
+            auto p2 = m_partition2.at(ind);
+            for( ; p1.first != p1.last; ++p1.first, ++p2.first )
+                if( !m_cmp(*p1.first, *p2.first) ) {
+                    m_result1.put(ind, p1.first);
+                    m_result2.put(ind, p2.first);
+                    return;
+                }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class Cmp>
+std::pair<FwdIt1, FwdIt2> mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, Cmp cmp) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Mismatch<FwdIt1, FwdIt2, Cmp> op{
+                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            op.dispatch_apply(chunks);
+            return {op.m_result1.min, op.m_result2.min};
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::mismatch(first1, last1, first2, cmp);
+}
+
+template <class FwdIt1, class FwdIt2>
+std::pair<FwdIt1, FwdIt2> mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    return ::pstld::mismatch(first1, last1, first2, std::equal_to<>{});
+}
+
+template <class FwdIt1, class FwdIt2, class Cmp>
+std::pair<FwdIt1, FwdIt2>
+mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) noexcept
+{
+    const auto count = std::min(std::distance(first1, last1), std::distance(first2, last2));
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Mismatch<FwdIt1, FwdIt2, Cmp> op{
+                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            op.dispatch_apply(chunks);
+            return {op.m_result1.min, op.m_result2.min};
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::mismatch(first1, last1, first2, last2, cmp);
+}
+
+template <class FwdIt1, class FwdIt2>
+std::pair<FwdIt1, FwdIt2>
+mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+{
+    return ::pstld::mismatch(first1, last1, first2, last2, std::equal_to<>{});
+}
+
 } // namespace pstld
