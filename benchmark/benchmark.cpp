@@ -46,7 +46,7 @@ std::chrono::steady_clock::duration measure(Setup setup, Work work)
 namespace benchmarks {
 
 template <class ExPo>
-struct all_of {
+struct all_of { // 25.6.1
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -59,7 +59,7 @@ struct all_of {
 };
 
 template <class ExPo>
-struct any_of {
+struct any_of { // 25.6.2
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -72,7 +72,7 @@ struct any_of {
 };
 
 template <class ExPo>
-struct none_of {
+struct none_of { // 25.6.3
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -85,7 +85,7 @@ struct none_of {
 };
 
 template <class ExPo>
-struct for_each {
+struct for_each { // 25.6.4
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -98,7 +98,7 @@ struct for_each {
 };
 
 template <class ExPo>
-struct find {
+struct find { // 25.6.5
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -108,7 +108,18 @@ struct find {
 };
 
 template <class ExPo>
-struct find_first_of {
+struct find_end { // 25.6.6
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2{42., 42., 42., 43.};
+        return measure(
+            [&] { v1 = std::vector<double>(size, 42.); },
+            [&] { noopt(std::find_end(ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end())); });
+    }
+};
+
+template <class ExPo>
+struct find_first_of { // 25.6.7
     auto operator()(size_t size)
     {
         std::vector<double> v1, v2{43., 44., 45., 46.};
@@ -119,7 +130,7 @@ struct find_first_of {
 };
 
 template <class ExPo>
-struct adjacent_find {
+struct adjacent_find { // 25.6.8
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -133,7 +144,7 @@ struct adjacent_find {
 };
 
 template <class ExPo>
-struct count {
+struct count { // 25.6.9
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -143,7 +154,27 @@ struct count {
 };
 
 template <class ExPo>
-struct search {
+struct mismatch { // 25.6.10
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure([&] { v1 = v2 = std::vector<double>(size, 42.); },
+                       [&] { noopt(std::mismatch(ExPo{}, v1.begin(), v1.end(), v2.begin())); });
+    }
+};
+
+template <class ExPo>
+struct equal { // 25.6.11
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure([&] { v1 = v2 = std::vector<double>(size, 42.); },
+                       [&] { noopt(std::equal(ExPo{}, v1.begin(), v1.end(), v2.begin())); });
+    }
+};
+
+template <class ExPo>
+struct search { // 25.6.13
     auto operator()(size_t size)
     {
         std::vector<double> v1, v2{42., 42., 42., 43.};
@@ -154,18 +185,48 @@ struct search {
 };
 
 template <class ExPo>
-struct find_end {
+struct transform { // 25.7.4
     auto operator()(size_t size)
     {
-        std::vector<double> v1, v2{42., 42., 42., 43.};
+        std::vector<double> v1, v2, v3;
         return measure(
-            [&] { v1 = std::vector<double>(size, 42.); },
-            [&] { noopt(std::find_end(ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end())); });
+            [&] {
+                v1 = std::vector<double>(size, 42.);
+                v2 = std::vector<double>(size, 71.);
+                v3 = std::vector<double>(size);
+            },
+            [&] {
+                std::transform(
+                    ExPo{}, v1.begin(), v1.end(), v2.begin(), v3.begin(), [](auto a, auto b) {
+                        return a * b;
+                    });
+                noopt(v3);
+            });
     }
 };
 
 template <class ExPo>
-struct reduce {
+struct is_sorted { // 25.8.2.5
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure([&] { v = std::vector<double>(size, 42.); },
+                       [&] { noopt(std::is_sorted(ExPo{}, v.begin(), v.end())); });
+    }
+};
+
+template <class ExPo>
+struct minmax_element { // 25.8.9
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure([&] { v = std::vector<double>(size, 42.); },
+                       [&] { noopt(std::minmax_element(ExPo{}, v.begin(), v.end())); });
+    }
+};
+
+template <class ExPo>
+struct reduce { // 25.10.4
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -175,7 +236,7 @@ struct reduce {
 };
 
 template <class ExPo>
-struct transform_reduce {
+struct transform_reduce { // 25.10.6
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -231,11 +292,16 @@ int main()
     results.emplace_back(record<benchmarks::none_of>());
     results.emplace_back(record<benchmarks::for_each>());
     results.emplace_back(record<benchmarks::find>());
+    results.emplace_back(record<benchmarks::find_end>());
     results.emplace_back(record<benchmarks::find_first_of>());
     results.emplace_back(record<benchmarks::adjacent_find>());
     results.emplace_back(record<benchmarks::count>());
+    results.emplace_back(record<benchmarks::mismatch>());
+    results.emplace_back(record<benchmarks::equal>());
     results.emplace_back(record<benchmarks::search>());
-    results.emplace_back(record<benchmarks::find_end>());
+    results.emplace_back(record<benchmarks::transform>());
+    results.emplace_back(record<benchmarks::is_sorted>());
+    results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::reduce>());
     results.emplace_back(record<benchmarks::transform_reduce>());
 
