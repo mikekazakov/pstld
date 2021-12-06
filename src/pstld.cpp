@@ -22,6 +22,34 @@ void dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_
     ::dispatch_apply_f(iterations, DISPATCH_APPLY_AUTO, ctx, function);
 }
 
+void dispatch_async(void *ctx, void (*function)(void *)) noexcept
+{
+    ::dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ctx, function);
+}
+
+DispatchGroup::DispatchGroup() noexcept
+    : m_group(dispatch_group_create()), m_queue(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0))
+{
+}
+
+DispatchGroup::~DispatchGroup()
+{
+    ::dispatch_release(static_cast<dispatch_group_t>(m_group));
+}
+
+void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept
+{
+    ::dispatch_group_async_f(static_cast<dispatch_group_t>(m_group),
+                             static_cast<dispatch_queue_t>(m_queue),
+                             ctx,
+                             function);
+}
+
+void DispatchGroup::wait() noexcept
+{
+    ::dispatch_group_wait(static_cast<dispatch_group_t>(m_group), DISPATCH_TIME_FOREVER);
+}
+
 const char *parallelism_exception::what() const noexcept
 {
     return "Failed to acquire resources to perform parallel computation";

@@ -7,10 +7,11 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <random>
 #include <cxxabi.h>
 
-static constexpr size_t g_Iterations = 100;
-static constexpr size_t g_IterationsDiscard = 5;
+static constexpr size_t g_Iterations = 10;
+static constexpr size_t g_IterationsDiscard = 1;
 static const std::array<size_t, 7> g_Sizes =
     {100, 1000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
 
@@ -206,6 +207,25 @@ struct transform { // 25.7.4
 };
 
 template <class ExPo>
+struct sort_1 { // 25.8.2.1
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure(
+            [&] {
+                std::mt19937 mt{42};
+                std::uniform_real_distribution<double> dist{0., 1.};
+                v = std::vector<double>(size);
+                std::generate(std::begin(v), std::end(v), [&dist, &mt] { return dist(mt); });
+            },
+            [&] {
+                std::sort(ExPo{}, v.begin(), v.end());
+                noopt(v);
+            });
+    }
+};
+
+template <class ExPo>
 struct is_sorted { // 25.8.2.5
     auto operator()(size_t size)
     {
@@ -300,6 +320,7 @@ int main()
     results.emplace_back(record<benchmarks::equal>());
     results.emplace_back(record<benchmarks::search>());
     results.emplace_back(record<benchmarks::transform>());
+    results.emplace_back(record<benchmarks::sort_1>());
     results.emplace_back(record<benchmarks::is_sorted>());
     results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::reduce>());

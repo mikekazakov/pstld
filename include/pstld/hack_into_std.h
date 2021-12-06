@@ -388,10 +388,46 @@ transform(ExPo &&, It1 first1, It1 last1, It2 first2, It3 first3, UnOp op) noexc
         return ::std::transform(first1, last1, first2, first3, op);
 }
 
+// 25.8.2.1 - sort /////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It>
+execution::__enable_if_execution_policy<ExPo, void> sort(ExPo &&, It first, It last)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::sort(first, last);
+    else
+        return ::std::sort(first, last);
+}
+
+template <class ExPo, class It, class Cmp>
+execution::__enable_if_execution_policy<ExPo, void> sort(ExPo &&, It first, It last, Cmp cmp)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::sort(first, last, cmp);
+    else
+        return ::std::sort(first, last, cmp);
+}
+
+// 25.8.2.2 - stable_sort //////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It>
+execution::__enable_if_execution_policy<ExPo, void> stable_sort(ExPo &&, It first, It last)
+{
+    // stub for now
+    return ::std::stable_sort(first, last);
+}
+
+template <class ExPo, class It, class Cmp>
+execution::__enable_if_execution_policy<ExPo, void> stable_sort(ExPo &&, It first, It last, Cmp cmp)
+{
+    // stub for now
+    return ::std::stable_sort(first, last, cmp);
+}
+
 // 25.8.2.5 - is_sorted, is_sorted_until ///////////////////////////////////////////////////////////
 
 template <class ExPo, class It>
-bool is_sorted(ExPo &&, It first, It last)
+execution::__enable_if_execution_policy<ExPo, bool> is_sorted(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::is_sorted(first, last);
@@ -400,7 +436,7 @@ bool is_sorted(ExPo &&, It first, It last)
 }
 
 template <class ExPo, class It, class Cmp>
-bool is_sorted(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, bool> is_sorted(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::is_sorted(first, last, cmp);
@@ -409,7 +445,7 @@ bool is_sorted(ExPo &&, It first, It last, Cmp cmp)
 }
 
 template <class ExPo, class It>
-It is_sorted_until(ExPo &&, It first, It last)
+execution::__enable_if_execution_policy<ExPo, It> is_sorted_until(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::is_sorted_until(first, last);
@@ -418,7 +454,8 @@ It is_sorted_until(ExPo &&, It first, It last)
 }
 
 template <class ExPo, class It, class Cmp>
-It is_sorted_until(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, It>
+is_sorted_until(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::is_sorted_until(first, last, cmp);
@@ -429,7 +466,7 @@ It is_sorted_until(ExPo &&, It first, It last, Cmp cmp)
 // 25.8.9 - min_element, max_element, minmax_element ///////////////////////////////////////////////
 
 template <class ExPo, class It>
-It min_element(ExPo &&, It first, It last)
+execution::__enable_if_execution_policy<ExPo, It> min_element(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::min_element(first, last);
@@ -438,7 +475,7 @@ It min_element(ExPo &&, It first, It last)
 }
 
 template <class ExPo, class It, class Cmp>
-It min_element(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, It> min_element(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::min_element(first, last, cmp);
@@ -447,7 +484,7 @@ It min_element(ExPo &&, It first, It last, Cmp cmp)
 }
 
 template <class ExPo, class It>
-It max_element(ExPo &&, It first, It last)
+execution::__enable_if_execution_policy<ExPo, It> max_element(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::max_element(first, last);
@@ -456,7 +493,7 @@ It max_element(ExPo &&, It first, It last)
 }
 
 template <class ExPo, class It, class Cmp>
-It max_element(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, It> max_element(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::max_element(first, last, cmp);
@@ -465,7 +502,8 @@ It max_element(ExPo &&, It first, It last, Cmp cmp)
 }
 
 template <class ExPo, class It>
-std::pair<It, It> minmax_element(ExPo &&, It first, It last)
+execution::__enable_if_execution_policy<ExPo, std::pair<It, It>>
+minmax_element(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::minmax_element(first, last);
@@ -474,7 +512,8 @@ std::pair<It, It> minmax_element(ExPo &&, It first, It last)
 }
 
 template <class ExPo, class It, class Cmp>
-std::pair<It, It> minmax_element(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, std::pair<It, It>>
+minmax_element(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::minmax_element(first, last, cmp);

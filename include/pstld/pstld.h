@@ -4,17 +4,38 @@
 #include <numeric>
 #include <iterator>
 #include <vector>
+#include <deque>
 #include <limits>
 #include <mutex>
+#include <optional>
 #include <cstddef>
 
 namespace pstld {
 
 namespace internal {
 
+inline constexpr size_t chunks_per_cpu = 8;
+inline constexpr size_t insertion_sort_limit = 32;
+
 size_t max_hw_threads() noexcept;
 
 void dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept;
+void dispatch_async(void *ctx, void (*function)(void *)) noexcept;
+
+class DispatchGroup
+{
+public:
+    DispatchGroup() noexcept;
+    DispatchGroup(const DispatchGroup &) = delete;
+    ~DispatchGroup();
+
+    void dispatch(void *ctx, void (*function)(void *)) noexcept;
+    void wait() noexcept;
+
+private:
+    void *m_group;
+    void *m_queue;
+};
 
 template <class It>
 using iterator_category_t = typename std::iterator_traits<It>::iterator_category;
@@ -108,8 +129,6 @@ struct unitialized_array : parallelism_allocator<T> {
 
     T *end() noexcept { return m_data + m_size; }
 };
-
-inline constexpr size_t chunks_per_cpu = 8;
 
 template <class T>
 constexpr size_t work_chunks_min_fraction_1(T count)
@@ -1523,6 +1542,270 @@ std::pair<FwdIt1, FwdIt2>
 mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
     return ::pstld::mismatch(first1, last1, first2, last2, std::equal_to<>{});
+}
+
+namespace internal {
+
+template <class It, class Pred>
+void insertion_sort(It first, It last, Pred pred)
+{
+    if( first == last )
+        return;
+    auto it = first;
+    ++it;
+    for( ; it != last; ++it ) {
+        auto hole = it;
+        iterator_value_t<It> v = std::move(*hole);
+        if( pred(v, *first) ) {
+            while( true ) {
+                *hole = std::move(*(hole - 1));
+                --hole;
+                if( hole == first )
+                    break;
+            }
+            *first = std::move(v);
+        }
+        else {
+            auto prev = std::prev(it);
+            while( true ) {
+                if( !pred(v, *prev) )
+                    break;
+                *hole = std::move(*prev);
+                hole = prev;
+                --prev;
+            }
+            *hole = std::move(v);
+        }
+    }
+}
+
+template <class It, class Pred>
+std::pair<It, It> partition(It first, It last, Pred pred)
+{
+    auto mid = first + (last - first) / 2;
+    auto pfirst = mid;
+    auto plast = std::next(mid);
+
+    while( first < pfirst && !pred(*(pfirst - 1), *pfirst) && !pred(*pfirst, *(pfirst - 1)) )
+        --pfirst;
+
+    while( plast < last && !pred(*plast, *pfirst) && !pred(*pfirst, *plast) )
+        ++plast;
+
+    auto gtfirst = plast;
+    auto lslast = pfirst;
+
+    while( true ) {
+        for( ; gtfirst < last; ++gtfirst ) {
+            if( pred(*pfirst, *gtfirst) )
+                continue;
+            if( pred(*gtfirst, *pfirst) )
+                break;
+            if( plast != gtfirst )
+                std::iter_swap(plast, gtfirst);
+            ++plast;
+        }
+        for( ; first < lslast; --lslast ) {
+            if( pred(*(lslast - 1), *pfirst) )
+                continue;
+            if( pred(*pfirst, *(lslast - 1)) )
+                break;
+            if( --pfirst != lslast - 1 )
+                std::iter_swap(pfirst, lslast - 1);
+        }
+        if( lslast == first && gtfirst == last )
+            return {pfirst, plast};
+        if( lslast == first ) {
+            if( plast != gtfirst )
+                std::iter_swap(pfirst, plast);
+            ++plast;
+            std::iter_swap(pfirst, gtfirst);
+            ++pfirst;
+            ++gtfirst;
+        }
+        else if( gtfirst == last ) {
+            if( --lslast != --pfirst )
+                std::iter_swap(lslast, pfirst);
+            std::iter_swap(pfirst, --plast);
+        }
+        else {
+            std::iter_swap(gtfirst, --lslast);
+            ++gtfirst;
+        }
+    }
+}
+
+template <class Load>
+struct NaiveWorkQueue {
+    std::mutex m_mut;
+    std::deque<Load> m_loads;
+    std::condition_variable m_ready;
+    bool m_done = false;
+
+public:
+    std::optional<Load> try_pop()
+    {
+        std::unique_lock<std::mutex> lock{m_mut, std::try_to_lock};
+        if( !lock || m_loads.empty() )
+            return std::nullopt;
+        auto l = std::move(m_loads.front());
+        m_loads.pop_front();
+        return std::optional<Load>(std::move(l));
+    }
+
+    std::optional<Load> pop()
+    {
+        std::unique_lock<std::mutex> lock{m_mut};
+        while( m_loads.empty() && !m_done )
+            m_ready.wait(lock);
+        if( m_loads.empty() )
+            return std::nullopt;
+        auto l = std::move(m_loads.front());
+        m_loads.pop_front();
+        return std::optional<Load>(std::move(l));
+    }
+
+    bool try_push(Load &&l)
+    {
+        {
+            std::unique_lock<std::mutex> lock{m_mut, std::try_to_lock};
+            if( !lock )
+                return false;
+            m_loads.emplace_back(std::move(l));
+        }
+        m_ready.notify_one();
+        return true;
+    }
+
+    void push(Load &&l)
+    {
+        {
+            std::unique_lock<std::mutex> lock{m_mut};
+            m_loads.emplace_back(std::move(l));
+        }
+        m_ready.notify_one();
+    }
+
+    void done()
+    {
+        {
+            std::unique_lock<std::mutex> lock{m_mut};
+            m_done = true;
+        }
+        m_ready.notify_all();
+    }
+};
+
+template <class It, class Cmp>
+struct Sort {
+    struct Work {
+        It first;
+        It last;
+    };
+
+    It m_first;
+    It m_last;
+    Cmp m_cmp;
+    DispatchGroup m_dg;
+    const size_t m_workers{max_hw_threads()};
+    std::atomic<size_t> m_next_worker_index{0};
+    std::atomic<size_t> m_next_queue{0};
+    std::atomic<size_t> m_jobs{1};
+    parallelism_vector<NaiveWorkQueue<Work>> m_queues{m_workers};
+
+    Sort(It first, It last, Cmp cmp) : m_first(first), m_last(last), m_cmp(cmp) {}
+
+    void start()
+    {
+        m_queues[0].push(Work{m_first, m_last});
+        for( size_t i = 1; i != m_workers; ++i )
+            m_dg.dispatch(static_cast<void *>(this), dispatch);
+        dispatch(static_cast<void *>(this));
+        m_dg.wait();
+    }
+
+    void dispatch_worker(size_t worker_index) noexcept
+    {
+        while( true ) {
+            std::optional<Work> load;
+            for( size_t n = 0; n != m_workers * 32; ++n ) {
+                load = m_queues[(worker_index + n) % m_workers].try_pop();
+                if( load )
+                    break;
+            }
+            if( load == std::nullopt )
+                load = m_queues[worker_index].pop();
+            if( load == std::nullopt )
+                break;
+
+            do_sort(load->first, load->last);
+
+            if( --m_jobs == 0 ) {
+                done();
+                return;
+            }
+        }
+    }
+
+    void done()
+    {
+        for( size_t i = 0; i != m_workers; ++i )
+            m_queues[i].done();
+    }
+
+    void do_sort(It first, It last)
+    {
+        while( first != last ) {
+            const auto len = last - first;
+            if( len <= insertion_sort_limit ) {
+                insertion_sort(first, last, m_cmp);
+                return;
+            }
+            else {
+                auto p = internal::partition(first, last, m_cmp);
+                if( p.second != last )
+                    fork(p.second, last);
+                last = p.first;
+            }
+        }
+    }
+
+    void fork(It first, It last)
+    {
+        Work load;
+        load.first = first;
+        load.last = last;
+        size_t q = m_next_queue++;
+        ++m_jobs;
+        for( size_t n = 0; n != m_workers; ++n ) {
+            if( m_queues[(q + n) % m_workers].try_push(std::move(load)) ) {
+                return;
+            }
+        }
+        m_queues[q % m_workers].push(std::move(load));
+    }
+
+    static void dispatch(void *ctx) noexcept
+    {
+        auto me = static_cast<Sort *>(ctx);
+        size_t index = me->m_next_worker_index++;
+        me->dispatch_worker(index);
+    }
+};
+
+} // namespace internal
+
+template <class RanIt, class Cmp>
+void sort(RanIt first, RanIt last, Cmp cmp) noexcept
+{
+    internal::Sort<RanIt, Cmp> sort(first, last, cmp);
+    sort.start();
+}
+
+template <class RanIt>
+void sort(RanIt first, RanIt last) noexcept
+{
+    return ::pstld::sort(first, last, std::less<>{});
 }
 
 } // namespace pstld
