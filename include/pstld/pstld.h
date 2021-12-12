@@ -9,6 +9,8 @@
 #include <mutex>
 #include <optional>
 #include <cstddef>
+#include <thread>
+#include <type_traits>
 
 namespace pstld {
 
@@ -16,6 +18,7 @@ namespace internal {
 
 inline constexpr size_t chunks_per_cpu = 8;
 inline constexpr size_t insertion_sort_limit = 32;
+inline constexpr size_t hardware_destructive_interference_size = 128; // or 64 on x86
 
 size_t max_hw_threads() noexcept;
 
@@ -307,6 +310,140 @@ template <class T>
 struct Dispatchable {
     static void dispatch(void *ctx, size_t ind) noexcept { static_cast<T *>(ctx)->run(ind); }
     void dispatch_apply(size_t count) noexcept { internal::dispatch_apply(count, this, dispatch); }
+};
+
+template <class T>
+struct CircularArray {
+    static_assert(std::is_trivial_v<T>);
+    static constexpr size_t default_log_size = 6;
+
+    size_t m_log_size;
+    std::atomic_int64_t m_ref_count;
+
+    static CircularArray *alloc(size_t log_size = default_log_size)
+    {
+        static_assert(sizeof(T) >= sizeof(CircularArray));
+
+        size_t count = static_cast<size_t>(1) << log_size;
+        size_t bytes = sizeof(T) * (count + 1);
+        auto buffer = static_cast<CircularArray *>(::operator new(bytes));
+        buffer->m_log_size = log_size;
+        buffer->m_ref_count = 1;
+        return buffer;
+    }
+
+    void retain() noexcept { ++m_ref_count; }
+
+    void release() noexcept
+    {
+        if( --m_ref_count == 0 )
+            ::operator delete(this);
+    }
+
+    T &operator[](size_t ind) noexcept
+    {
+        auto elements = reinterpret_cast<T *>(this) + 1;
+        auto mask = (static_cast<size_t>(1) << m_log_size) - 1;
+        return elements[ind & mask];
+    }
+
+    constexpr size_t size() noexcept { return static_cast<size_t>(1) << m_log_size; }
+
+    CircularArray *grow(size_t bottom, size_t top)
+    {
+        auto grown = alloc(m_log_size + 1);
+        for( size_t ind = top; ind != bottom; ++ind )
+            (*grown)[ind] = (*this)[ind];
+        return grown;
+    }
+};
+
+template <class T>
+struct alignas(hardware_destructive_interference_size) CircularWorkStealingDeque {
+    std::atomic<size_t> m_bottom{0};
+    std::atomic<size_t> m_top{0};
+    CircularArray<T> *m_array{CircularArray<T>::alloc()};
+    std::mutex m_mut;
+
+    CircularWorkStealingDeque() = default;
+    CircularWorkStealingDeque(const CircularWorkStealingDeque &) = delete;
+    CircularWorkStealingDeque &operator=(const CircularWorkStealingDeque &) = delete;
+    ~CircularWorkStealingDeque() { m_array->release(); }
+
+    void push_bottom(const T &val)
+    {
+        size_t bottom = m_bottom.load();
+        size_t top = m_top.load();
+        size_t size = bottom - top;
+        if( size >= m_array->size() ) {
+            CircularArray<T> *grown = m_array->grow(bottom, top);
+            CircularArray<T> *current;
+            {
+                std::lock_guard lock{m_mut};
+                current = std::exchange(m_array, grown);
+            }
+            current->release();
+        }
+        (*m_array)[bottom] = val;
+        m_bottom.store(bottom + 1);
+    }
+
+    bool pop_bottom(T &val) noexcept
+    {
+        size_t bottom = m_bottom.load();
+        if( bottom == 0 )
+            return false;
+        --bottom;
+        m_bottom.store(bottom);
+        size_t top = m_top.load();
+        if( bottom < top ) {
+            m_bottom.store(top);
+            return false;
+        }
+
+        val = (*m_array)[bottom];
+
+        if( bottom > top )
+            return true;
+
+        if( m_top.compare_exchange_strong(top, top + 1) ) {
+            m_bottom.store(top + 1);
+            return true;
+        }
+        else {
+            m_bottom.store(top);
+            return false;
+        }
+    }
+
+    bool steal_top(T &val) noexcept
+    {
+        size_t top = m_top.load();
+        while( true ) {
+            if( m_bottom.load() <= top )
+                return false;
+            CircularArray<T> *current;
+            {
+                std::lock_guard lock{m_mut};
+                current = m_array;
+                current->retain();
+            }
+            val = (*current)[top];
+            current->release();
+            if( m_top.compare_exchange_strong(top, top + 1) )
+                return true;
+        }
+    }
+};
+
+struct alignas(hardware_destructive_interference_size) WorkCounter {
+    std::atomic<size_t> m_done{0};
+    void commit_relaxed(size_t newly_done) noexcept
+    {
+        size_t done = m_done.load(std::memory_order_relaxed);
+        m_done.store(done + newly_done, std::memory_order_relaxed);
+    }
+    size_t load_relaxed() noexcept { return m_done.load(std::memory_order_relaxed); }
 };
 
 } // namespace internal
@@ -1635,154 +1772,112 @@ std::pair<It, It> partition(It first, It last, Pred pred)
     }
 }
 
-template <class Load>
-struct NaiveWorkQueue {
-    std::mutex m_mut;
-    std::deque<Load> m_loads;
-    std::condition_variable m_ready;
-    bool m_done = false;
-
-public:
-    std::optional<Load> try_pop()
-    {
-        std::unique_lock<std::mutex> lock{m_mut, std::try_to_lock};
-        if( !lock || m_loads.empty() )
-            return std::nullopt;
-        auto l = std::move(m_loads.front());
-        m_loads.pop_front();
-        return std::optional<Load>(std::move(l));
-    }
-
-    std::optional<Load> pop()
-    {
-        std::unique_lock<std::mutex> lock{m_mut};
-        while( m_loads.empty() && !m_done )
-            m_ready.wait(lock);
-        if( m_loads.empty() )
-            return std::nullopt;
-        auto l = std::move(m_loads.front());
-        m_loads.pop_front();
-        return std::optional<Load>(std::move(l));
-    }
-
-    bool try_push(Load &&l)
-    {
-        {
-            std::unique_lock<std::mutex> lock{m_mut, std::try_to_lock};
-            if( !lock )
-                return false;
-            m_loads.emplace_back(std::move(l));
-        }
-        m_ready.notify_one();
-        return true;
-    }
-
-    void push(Load &&l)
-    {
-        {
-            std::unique_lock<std::mutex> lock{m_mut};
-            m_loads.emplace_back(std::move(l));
-        }
-        m_ready.notify_one();
-    }
-
-    void done()
-    {
-        {
-            std::unique_lock<std::mutex> lock{m_mut};
-            m_done = true;
-        }
-        m_ready.notify_all();
-    }
-};
-
 template <class It, class Cmp>
 struct Sort {
     struct Work {
-        It first;
-        It last;
+        size_t first;
+        size_t last;
     };
 
     It m_first;
     It m_last;
+    size_t m_size;
     Cmp m_cmp;
     DispatchGroup m_dg;
-    const size_t m_workers{max_hw_threads()};
-    std::atomic<size_t> m_next_worker_index{0};
-    std::atomic<size_t> m_next_queue{0};
-    std::atomic<size_t> m_jobs{1};
-    parallelism_vector<NaiveWorkQueue<Work>> m_queues{m_workers};
+    size_t m_workers{max_hw_threads()};
+    std::atomic<size_t> m_next_worker_index{1};
+    parallelism_vector<CircularWorkStealingDeque<Work>> m_queues{m_workers};
+    parallelism_vector<WorkCounter> m_work_counters{m_workers};
 
-    Sort(It first, It last, Cmp cmp) : m_first(first), m_last(last), m_cmp(cmp) {}
+    Sort(It first, It last, Cmp cmp)
+        : m_first(first), m_last(last), m_size(last - first), m_cmp(cmp)
+    {
+    }
 
     void start()
     {
-        m_queues[0].push(Work{m_first, m_last});
+        m_queues[0].push_bottom(Work{0, m_size});
         for( size_t i = 1; i != m_workers; ++i )
             m_dg.dispatch(static_cast<void *>(this), dispatch);
-        dispatch(static_cast<void *>(this));
+        dispatch_worker(0);
         m_dg.wait();
     }
 
     void dispatch_worker(size_t worker_index) noexcept
     {
+        Work w;
         while( true ) {
-            std::optional<Work> load;
-            for( size_t n = 0; n != m_workers * 32; ++n ) {
-                load = m_queues[(worker_index + n) % m_workers].try_pop();
-                if( load )
-                    break;
+            if( m_queues[worker_index].pop_bottom(w) ) {
+                // have a local work to do
+                do_sort(w, worker_index);
+                continue;
             }
-            if( load == std::nullopt )
-                load = m_queues[worker_index].pop();
-            if( load == std::nullopt )
+
+            for( size_t i = 1; i != m_workers; ++i ) {
+                size_t steal_index = (i + worker_index) % m_workers;
+                if( m_queues[steal_index].steal_top(w) ) {
+                    // stolen from an other queue
+                    do_sort(w, worker_index);
+                    continue;
+                }
+            }
+
+            // nothing to do - perhaps we are done?
+            if( is_done() )
                 break;
 
-            do_sort(load->first, load->last);
-
-            if( --m_jobs == 0 ) {
-                done();
-                return;
-            }
+            // give up execution
+            std::this_thread::yield();
         }
     }
 
-    void done()
+    void do_sort(const Work w, size_t worker_index)
     {
-        for( size_t i = 0; i != m_workers; ++i )
-            m_queues[i].done();
-    }
-
-    void do_sort(It first, It last)
-    {
+        auto first = m_first + w.first;
+        auto last = m_first + w.last;
         while( first != last ) {
             const auto len = last - first;
             if( len <= insertion_sort_limit ) {
+                // small len - do an insertion sort
                 insertion_sort(first, last, m_cmp);
-                return;
+                m_work_counters[worker_index].commit_relaxed(len);
+                break;
             }
             else {
+                // regular len - do a quicksort
                 auto p = internal::partition(first, last, m_cmp);
-                if( p.second != last )
-                    fork(p.second, last);
-                last = p.first;
+                const auto left_len = p.second - first;
+                const auto mid_len = p.second - p.first;
+                const auto right_len = last - p.second;
+                m_work_counters[worker_index].commit_relaxed(mid_len);
+                if( right_len != 0 ) {
+                    if( left_len != 0 ) {
+                        // fork the right unsorted side
+                        // process locally the left unsorted side
+                        m_queues[worker_index].push_bottom(
+                            Work{static_cast<size_t>(std::distance(m_first, p.second)),
+                                 static_cast<size_t>(std::distance(m_first, last))});
+                        last = p.first;
+                    }
+                    else {
+                        // nothing to do on the left - process the right side locally
+                        first = p.second;
+                    }
+                }
+                else {
+                    // nothing to do on the right - process the left side locally
+                    last = p.first;
+                }
             }
         }
     }
 
-    void fork(It first, It last)
+    bool is_done() noexcept
     {
-        Work load;
-        load.first = first;
-        load.last = last;
-        size_t q = m_next_queue++;
-        ++m_jobs;
-        for( size_t n = 0; n != m_workers; ++n ) {
-            if( m_queues[(q + n) % m_workers].try_push(std::move(load)) ) {
-                return;
-            }
-        }
-        m_queues[q % m_workers].push(std::move(load));
+        size_t done = 0;
+        for( size_t i = 0; i != m_workers; ++i )
+            done += m_work_counters[i].load_relaxed();
+        return done == m_size;
     }
 
     static void dispatch(void *ctx) noexcept
