@@ -23,3 +23,15 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 25.6.12 | std::is_permutation | ❌ | ❌
 25.6.13 | std::search | ✅ | ✅
 | | std::search_n | ✅ | ✅
+25.7.1 | std::copy | ❌ | ❌
+| | std::copy_n | ❌ | ❌
+| | std::copy_if | ❌ | ❌
+25.7.2 | std::move | ❌ | ❌
+25.7.3 | std::swap_ranges | ❌ | ❌
+25.7.4 | std::transform | ✅ | ✅
+25.7.5 | std::replace | ❌ | ❌
+| | std::replace_if | ❌ | ❌
+| | std::replace_copy | ❌ | ❌
+| | std::replace_copy_if | ❌ | ❌
+
+
