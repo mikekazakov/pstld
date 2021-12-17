@@ -207,7 +207,7 @@ struct transform { // 25.7.4
 };
 
 template <class ExPo>
-struct sort_1 { // 25.8.2.1
+struct sort_Rnd { // 25.8.2.1, semi-random input
     auto operator()(size_t size)
     {
         std::vector<double> v;
@@ -217,6 +217,56 @@ struct sort_1 { // 25.8.2.1
                 std::uniform_real_distribution<double> dist{0., 1.};
                 v = std::vector<double>(size);
                 std::generate(std::begin(v), std::end(v), [&dist, &mt] { return dist(mt); });
+            },
+            [&] {
+                std::sort(ExPo{}, v.begin(), v.end());
+                noopt(v);
+            });
+    }
+};
+
+template <class ExPo>
+struct sort_Eq { // 25.8.2.1, equal input
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure([&] { v = std::vector<double>(size, 42.); },
+                       [&] {
+                           std::sort(ExPo{}, v.begin(), v.end());
+                           noopt(v);
+                       });
+    }
+};
+
+template <class ExPo>
+struct sort_Asc { // 25.8.2.1, ascending
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure(
+            [&] {
+                v = std::vector<double>(size);
+                std::iota(v.begin(), v.end(), 0.);
+            },
+            [&] {
+                std::sort(ExPo{}, v.begin(), v.end());
+                noopt(v);
+            });
+    }
+};
+
+template <class ExPo>
+struct sort_Des { // 25.8.2.1, descending
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure(
+            [&] {
+                v = std::vector<double>(size);
+                std::generate(
+                    v.begin(), v.end(), [v = std::numeric_limits<double>::max()]() mutable {
+                        return v -= 1.;
+                    });
             },
             [&] {
                 std::sort(ExPo{}, v.begin(), v.end());
@@ -320,7 +370,10 @@ int main()
     results.emplace_back(record<benchmarks::equal>());
     results.emplace_back(record<benchmarks::search>());
     results.emplace_back(record<benchmarks::transform>());
-    results.emplace_back(record<benchmarks::sort_1>());
+    results.emplace_back(record<benchmarks::sort_Rnd>());
+    results.emplace_back(record<benchmarks::sort_Eq>());
+    results.emplace_back(record<benchmarks::sort_Asc>());
+    results.emplace_back(record<benchmarks::sort_Des>());
     results.emplace_back(record<benchmarks::is_sorted>());
     results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::reduce>());

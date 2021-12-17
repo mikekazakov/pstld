@@ -1751,7 +1751,7 @@ std::pair<It, It> partition(It first, It last, Pred pred)
 {
     auto mid = first + (last - first) / 2;
     guess_median(first, mid, std::prev(last), pred);
-    
+
     auto pfirst = mid;
     auto plast = std::next(mid);
 
@@ -1804,11 +1804,22 @@ std::pair<It, It> partition(It first, It last, Pred pred)
     }
 }
 
+inline size_t log2(size_t n) noexcept
+{
+    size_t log2n = 0;
+    while( n > 1 ) {
+        log2n++;
+        n >>= 1;
+    }
+    return log2n;
+}
+
 template <class It, class Cmp>
 struct Sort {
     struct Work {
         size_t first;
         size_t last;
+        size_t depth;
     };
 
     It m_first;
@@ -1828,7 +1839,7 @@ struct Sort {
 
     void start()
     {
-        m_queues[0].push_bottom(Work{0, m_size});
+        m_queues[0].push_bottom(Work{0, m_size, 2 * log2(m_size)});
         for( size_t i = 1; i != m_workers; ++i )
             m_dg.dispatch(static_cast<void *>(this), dispatch);
         dispatch_worker(0);
@@ -1867,6 +1878,7 @@ struct Sort {
     {
         auto first = m_first + w.first;
         auto last = m_first + w.last;
+        auto depth = w.depth;
         while( first != last ) {
             const auto len = last - first;
             if( len <= insertion_sort_limit ) {
@@ -1875,8 +1887,15 @@ struct Sort {
                 m_work_counters[worker_index].commit_relaxed(len);
                 break;
             }
+            else if( depth == 0 ) {
+                std::make_heap(first, last, m_cmp);
+                std::sort_heap(first, last, m_cmp);
+                m_work_counters[worker_index].commit_relaxed(len);
+                break;
+            }
             else {
                 // regular len - do a quicksort
+                --depth;
                 auto p = internal::partition(first, last, m_cmp);
                 const auto left_len = p.second - first;
                 const auto mid_len = p.second - p.first;
@@ -1888,7 +1907,8 @@ struct Sort {
                         // process locally the left unsorted side
                         m_queues[worker_index].push_bottom(
                             Work{static_cast<size_t>(std::distance(m_first, p.second)),
-                                 static_cast<size_t>(std::distance(m_first, last))});
+                                 static_cast<size_t>(std::distance(m_first, last)),
+                                 depth});
                         last = p.first;
                     }
                     else {
