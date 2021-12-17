@@ -1717,9 +1717,41 @@ void insertion_sort(It first, It last, Pred pred)
 }
 
 template <class It, class Pred>
+void median_3(It it1, It it2, It it3, Pred pred)
+{
+    // orders elements at i1, it2, i3 by pred
+    if( pred(*it2, *it1) )
+        std::iter_swap(it1, it2);
+    if( pred(*it3, *it2) ) {
+        std::iter_swap(it2, it3);
+        if( pred(*it2, *it1) )
+            std::iter_swap(it1, it2);
+    }
+}
+
+template <class It, class Pred>
+void guess_median(It it1, It mid, It it2, Pred pred)
+{
+    const auto size = it2 - it1;
+    if( size > 40 ) {
+        const auto _1_8 = size / 8;
+        const auto _1_4 = size / 4;
+        median_3(it1, it1 + _1_8, it1 + _1_4, pred);
+        median_3(mid - _1_8, mid, mid + _1_8, pred);
+        median_3(it2 - _1_4, it2 - _1_8, it2, pred);
+        median_3(it1 + _1_8, mid, it2 - _1_8, pred);
+    }
+    else {
+        median_3(it1, mid, it2, pred);
+    }
+}
+
+template <class It, class Pred>
 std::pair<It, It> partition(It first, It last, Pred pred)
 {
     auto mid = first + (last - first) / 2;
+    guess_median(first, mid, std::prev(last), pred);
+    
     auto pfirst = mid;
     auto plast = std::next(mid);
 
