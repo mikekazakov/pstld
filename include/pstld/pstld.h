@@ -1978,4 +1978,59 @@ void sort(RanIt first, RanIt last) noexcept
     return ::pstld::sort(first, last, std::less<>{});
 }
 
+namespace internal {
+
+template <class It, class T>
+struct Fill : Dispatchable<Fill<It, T>> {
+    Partition<It> m_partition;
+    T m_val;
+
+    Fill(size_t count, size_t chunks, It first, T val)
+        : m_partition(first, count, chunks), m_val(val)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        std::fill(p.first, p.last, m_val);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class T>
+void fill(FwdIt first, FwdIt last, const T &val) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Fill<FwdIt, T> op{static_cast<size_t>(count), chunks, first, val};
+            op.dispatch_apply(chunks);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::fill(first, last, val);
+}
+
+template <class FwdIt, class Size, class T>
+FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
+{
+    if( count < 1 )
+        return first;
+    
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Fill<FwdIt, T> op{static_cast<size_t>(count), chunks, first, val};
+            op.dispatch_apply(chunks);
+            return op.m_partition.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::fill_n(first, count, val);
+}
+
 } // namespace pstld

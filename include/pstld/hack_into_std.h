@@ -388,6 +388,28 @@ transform(ExPo &&, It1 first1, It1 last1, It2 first2, It3 first3, UnOp op) noexc
         return ::std::transform(first1, last1, first2, first3, op);
 }
 
+// 25.7.6 - fill, fill_n ///////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class T>
+execution::__enable_if_execution_policy<ExPo, void>
+fill(ExPo &&, It first, It last, const T &value) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::fill(first, last, value);
+    else
+        ::std::fill(first, last, value);
+}
+
+template <class ExPo, class It, class Size, class T>
+execution::__enable_if_execution_policy<ExPo, It>
+fill_n(ExPo &&, It first, Size count, const T &value) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::fill_n(first, count, value);
+    else
+        return ::std::fill_n(first, count, value);
+}
+
 // 25.8.2.1 - sort /////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It>
