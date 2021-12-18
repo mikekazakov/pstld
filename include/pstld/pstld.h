@@ -326,7 +326,11 @@ struct CircularArray {
 
         size_t count = static_cast<size_t>(1) << log_size;
         size_t bytes = sizeof(T) * (count + 1);
-        auto buffer = static_cast<CircularArray *>(::operator new(bytes));
+
+        auto buffer = static_cast<CircularArray *>(::operator new(bytes, std::nothrow));
+        if( buffer == nullptr )
+            parallelism_exception::raise();
+
         buffer->m_log_size = log_size;
         buffer->m_ref_count = 1;
         return buffer;
@@ -1837,7 +1841,7 @@ struct Sort {
     {
     }
 
-    void start()
+    void start() noexcept
     {
         m_queues[0].push_bottom(Work{0, m_size, 2 * log2(m_size)});
         for( size_t i = 1; i != m_workers; ++i )
@@ -1874,7 +1878,7 @@ struct Sort {
         }
     }
 
-    void do_sort(const Work w, size_t worker_index)
+    void do_sort(const Work w, size_t worker_index) noexcept
     {
         auto first = m_first + w.first;
         auto last = m_first + w.last;
@@ -1904,11 +1908,12 @@ struct Sort {
                 if( right_len != 0 ) {
                     if( left_len != 0 ) {
                         // fork the right unsorted side
+                        fork(worker_index,
+                             static_cast<size_t>(std::distance(m_first, p.second)),
+                             static_cast<size_t>(std::distance(m_first, last)),
+                             depth);
+
                         // process locally the left unsorted side
-                        m_queues[worker_index].push_bottom(
-                            Work{static_cast<size_t>(std::distance(m_first, p.second)),
-                                 static_cast<size_t>(std::distance(m_first, last)),
-                                 depth});
                         last = p.first;
                     }
                     else {
@@ -1921,6 +1926,16 @@ struct Sort {
                     last = p.first;
                 }
             }
+        }
+    }
+
+    void fork(size_t worker_index, size_t first, size_t last, size_t depth) noexcept
+    {
+        try {
+            m_queues[worker_index].push_bottom(Work{first, last, depth});
+        } catch( const parallelism_exception & ) {
+            ::std::sort(m_first + first, m_first + last, m_cmp);
+            m_work_counters[worker_index].commit_relaxed(last - first);
         }
     }
 
@@ -1945,8 +1960,16 @@ struct Sort {
 template <class RanIt, class Cmp>
 void sort(RanIt first, RanIt last, Cmp cmp) noexcept
 {
-    internal::Sort<RanIt, Cmp> sort(first, last, cmp);
-    sort.start();
+    const auto count = std::distance(first, last);
+    if( count > internal::insertion_sort_limit ) {
+        try {
+            internal::Sort<RanIt, Cmp> sort(first, last, cmp);
+            sort.start();
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    std::sort(first, last, cmp);
 }
 
 template <class RanIt>
