@@ -388,6 +388,28 @@ transform(ExPo &&, It1 first1, It1 last1, It2 first2, It3 first3, UnOp op) noexc
         return ::std::transform(first1, last1, first2, first3, op);
 }
 
+// 25.7.5 - replace, replace_if ////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class T>
+execution::__enable_if_execution_policy<ExPo, void>
+replace(ExPo &&, It first, It last, const T &old_val, const T &new_val) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::replace(first, last, old_val, new_val);
+    else
+        ::std::replace(first, last, old_val, new_val);
+}
+
+template <class ExPo, class It, class Pred, class T>
+execution::__enable_if_execution_policy<ExPo, void>
+replace_if(ExPo &&, It first, It last, Pred pred, const T &new_val) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::replace_if(first, last, pred, new_val);
+    else
+        ::std::replace_if(first, last, pred, new_val);
+}
+
 // 25.7.6 - fill, fill_n ///////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
@@ -618,4 +640,17 @@ transform_reduce(ExPo &&, It first, It last, T val, BinOp bop, UnOp uop) noexcep
 // a hack to suport running tests from LLVM's PSTL
 namespace __pstl {
 namespace execution = ::std::execution;
-}
+namespace __internal {
+template <typename T>
+struct __equal_value {
+    const T &val;
+    explicit __equal_value(const T &val) : val(val) {}
+    template <typename U>
+    bool operator()(U &&other) const
+    {
+        return std::forward<U>(other) == val;
+    }
+};
+} // namespace __internal
+
+} // namespace __pstl

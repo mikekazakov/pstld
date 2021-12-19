@@ -2020,7 +2020,7 @@ FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
 {
     if( count < 1 )
         return first;
-    
+
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
@@ -2031,6 +2031,24 @@ FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
         }
     }
     return std::fill_n(first, count, val);
+}
+
+template <class FwdIt, class T>
+void replace(FwdIt first, FwdIt last, const T &old_val, const T &new_val) noexcept
+{
+    ::pstld::for_each(first, last, [&](auto &val) {
+        if( val == old_val )
+            val = new_val;
+    });
+}
+
+template <class FwdIt, class Pred, class T>
+void replace_if(FwdIt first, FwdIt last, Pred pred, const T &new_val) noexcept
+{
+    ::pstld::for_each(first, last, [&, pred](auto &val) mutable {
+        if( pred(val) )
+            val = new_val;
+    });
 }
 
 } // namespace pstld

@@ -29,8 +29,8 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 25.7.2 | std::move | ❌ | ❌
 25.7.3 | std::swap_ranges | ❌ | ❌
 25.7.4 | std::transform | ✅ | ✅
-25.7.5 | std::replace | ❌ | ❌
-| | std::replace_if | ❌ | ❌
+25.7.5 | std::replace | ✅ | ✅
+| | std::replace_if | ✅ | ✅
 | | std::replace_copy | ❌ | ❌
 | | std::replace_copy_if | ❌ | ❌
 25.7.6 | std::fill | ✅ | ✅

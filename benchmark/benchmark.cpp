@@ -207,6 +207,19 @@ struct transform { // 25.7.4
 };
 
 template <class ExPo>
+struct replace { // 25.7.5
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure([&] { v = std::vector<double>(size, 42.); },
+                       [&] {
+                           std::replace(ExPo{}, v.begin(), v.end(), 42., 43.);
+                           noopt(v);
+                       });
+    }
+};
+
+template <class ExPo>
 struct fill { // 25.7.6
     auto operator()(size_t size)
     {
@@ -383,6 +396,7 @@ int main()
     results.emplace_back(record<benchmarks::equal>());
     results.emplace_back(record<benchmarks::search>());
     results.emplace_back(record<benchmarks::transform>());
+    results.emplace_back(record<benchmarks::replace>());
     results.emplace_back(record<benchmarks::fill>());
     results.emplace_back(record<benchmarks::sort_Rnd>());
     results.emplace_back(record<benchmarks::sort_Eq>());

@@ -28,7 +28,7 @@ set(UNIT_TESTS
 #   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_partition/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_reduce/test.cpp
 #   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_remove/test.cpp
-#   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_replace/test.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_replace/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_search/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_search_n/test.cpp
 #   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_set_difference/test.cpp
