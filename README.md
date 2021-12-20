@@ -31,8 +31,8 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 25.7.4 | std::transform | ✅ | ✅
 25.7.5 | std::replace | ✅ | ✅
 | | std::replace_if | ✅ | ✅
-| | std::replace_copy | ❌ | ❌
-| | std::replace_copy_if | ❌ | ❌
+| | std::replace_copy | ✅ | ❌
+| | std::replace_copy_if | ✅ | ❌
 25.7.6 | std::fill | ✅ | ✅
 | | std::fill_n | ✅ | ✅
 25.7.7 | std::generate | ❌ | ❌

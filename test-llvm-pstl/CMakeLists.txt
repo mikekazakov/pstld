@@ -12,6 +12,7 @@ set_target_properties(check-pstld-llvm PROPERTIES FOLDER "Tests/LLVM")
 set(UNIT_TESTS
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.modifying.operations/fill.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.modifying.operations/replace.pass.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.modifying.operations/replace_copy.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.modifying.operations/transform_binary.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.modifying.operations/transform_unary.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.nonmodifying/adjacent_find.pass.cpp

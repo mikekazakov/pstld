@@ -410,6 +410,22 @@ replace_if(ExPo &&, It first, It last, Pred pred, const T &new_val) noexcept
         ::std::replace_if(first, last, pred, new_val);
 }
 
+template <class ExPo, class It1, class It2, class T>
+execution::__enable_if_execution_policy<ExPo, It2>
+replace_copy(ExPo &&, It1 first, It1 last, It2 result, const T &old_value, const T &new_value)
+{
+    // stub only
+    return ::std::replace_copy(first, last, result, old_value, new_value);
+}
+
+template <class ExPo, class It1, class It2, class Pred, class T>
+execution::__enable_if_execution_policy<ExPo, It2>
+replace_copy_if(ExPo &&, It1 first, It1 last, It2 result, Pred pred, const T &new_value)
+{
+    // stub only
+    return ::std::replace_copy_if(first, last, result, pred, new_value);
+}
+
 // 25.7.6 - fill, fill_n ///////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
