@@ -388,7 +388,7 @@ transform(ExPo &&, It1 first1, It1 last1, It2 first2, It3 first3, UnOp op) noexc
         return ::std::transform(first1, last1, first2, first3, op);
 }
 
-// 25.7.5 - replace, replace_if ////////////////////////////////////////////////////////////////////
+// 25.7.5 - replace, replace_if, replace_copy, replace_copy_if /////////////////////////////////////
 
 template <class ExPo, class It, class T>
 execution::__enable_if_execution_policy<ExPo, void>
@@ -446,6 +446,22 @@ fill_n(ExPo &&, It first, Size count, const T &value) noexcept
         return ::pstld::fill_n(first, count, value);
     else
         return ::std::fill_n(first, count, value);
+}
+
+// 25.7.7 - generate, generate_n ///////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class Gen>
+execution::__enable_if_execution_policy<ExPo, void> generate(ExPo &&, It first, It last, Gen gen)
+{
+    // stub only
+    ::std::generate(first, last, gen);
+}
+
+template <class ExPo, class It, class Size, class Gen>
+execution::__enable_if_execution_policy<ExPo, It> generate_n(ExPo &&, It first, Size count, Gen gen)
+{
+    // stub only
+    return ::std::generate_n(first, count, gen);
 }
 
 // 25.8.2.1 - sort /////////////////////////////////////////////////////////////////////////////////
