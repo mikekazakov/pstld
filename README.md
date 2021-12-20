@@ -20,7 +20,6 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 | | std::count_if | ✅ | ✅
 25.6.10 | std::mismatch | ✅ | ✅
 25.6.11 | std::equal | ✅ | ✅
-25.6.12 | std::is_permutation | ❌ | ❌
 25.6.13 | std::search | ✅ | ✅
 | | std::search_n | ✅ | ✅
 25.7.1 | std::copy | ❌ | ❌
