@@ -366,6 +366,38 @@ search_n(ExPo &&, It first, It last, Size count, const T &value, Pred pred) noex
         return ::std::search_n(first, last, count, value, pred);
 }
 
+// 25.7.1 - copy, copy_n, copy_if //////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+copy(ExPo &&, It1 first, It1 last, It2 result) noexcept
+{
+    return ::std::copy(first, last, result); // stub only
+}
+
+template <class ExPo, class It1, class Size, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+copy_n(ExPo &&, It1 first, Size count, It2 result) noexcept
+{
+    return ::std::copy_n(first, count, result); // stub only
+}
+
+template <class ExPo, class It1, class It2, class Pred>
+execution::__enable_if_execution_policy<ExPo, It2>
+copy_if(ExPo &&, It1 first, It1 last, It2 result, Pred pred) noexcept
+{
+    return ::std::copy_if(first, last, result, pred); // stub only
+}
+
+// 25.7.2 - move ///////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+move(ExPo &&, It1 first, It1 last, It2 result) noexcept
+{
+    return ::std::move(first, last, result); // stub only
+}
+
 // 25.7.4 - transform //////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2, class UnOp>
