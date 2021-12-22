@@ -203,6 +203,23 @@ struct copy { // 25.7.1
 };
 
 template <class ExPo>
+struct swap_ranges { // 25.7.3
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure(
+            [&] {
+                v1 = std::vector<double>(size, 42.);
+                v2 = std::vector<double>(size, 43.);
+            },
+            [&] {
+                std::swap_ranges(ExPo{}, v1.begin(), v1.end(), v2.begin());
+                noopt(v2);
+            });
+    }
+};
+
+template <class ExPo>
 struct transform { // 25.7.4
     auto operator()(size_t size)
     {
@@ -413,6 +430,7 @@ int main()
     results.emplace_back(record<benchmarks::equal>());
     results.emplace_back(record<benchmarks::search>());
     results.emplace_back(record<benchmarks::copy>());
+    results.emplace_back(record<benchmarks::swap_ranges>());
     results.emplace_back(record<benchmarks::transform>());
     results.emplace_back(record<benchmarks::replace>());
     results.emplace_back(record<benchmarks::fill>());

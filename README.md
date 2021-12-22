@@ -26,7 +26,7 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 | | std::copy_n | ✅ | ✅
 | | std::copy_if | ✅ | ❌
 25.7.2 | std::move | ✅ | ❌
-25.7.3 | std::swap_ranges | ❌ | ❌
+25.7.3 | std::swap_ranges | ✅ | ✅
 25.7.4 | std::transform | ✅ | ✅
 25.7.5 | std::replace | ✅ | ✅
 | | std::replace_if | ✅ | ✅

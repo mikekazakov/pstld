@@ -404,6 +404,18 @@ move(ExPo &&, It1 first, It1 last, It2 result) noexcept
     return ::std::move(first, last, result); // stub only
 }
 
+// 25.7.3 - swap_ranges ////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+swap_ranges(ExPo &&, It1 first, It1 last, It2 result) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::swap_ranges(first, last, result);
+    else
+        return ::std::swap_ranges(first, last, result);
+}
+
 // 25.7.4 - transform //////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2, class UnOp>

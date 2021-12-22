@@ -2104,4 +2104,43 @@ void replace_if(FwdIt first, FwdIt last, Pred pred, const T &new_val) noexcept
     });
 }
 
+namespace internal {
+
+template <class It1, class It2>
+struct SwapRanges : Dispatchable<SwapRanges<It1, It2>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+
+    SwapRanges(size_t count, size_t chunks, It1 first1, It2 first2)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        std::swap_ranges(p1.first, p1.last, p2.first);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 swap_ranges(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::SwapRanges<FwdIt1, FwdIt2> op{
+                static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::swap_ranges(first1, last1, first2);
+}
+
 } // namespace pstld
