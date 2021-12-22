@@ -2033,6 +2033,59 @@ FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
     return std::fill_n(first, count, val);
 }
 
+namespace internal {
+
+template <class It1, class It2>
+struct Copy : Dispatchable<Copy<It1, It2>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+
+    Copy(size_t count, size_t chunks, It1 first1, It2 first2)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        std::copy(p1.first, p1.last, p2.first);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 copy(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Copy<FwdIt1, FwdIt2> op{static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::copy(first1, last1, first2);
+}
+
+template <class FwdIt1, class Size, class FwdIt2>
+FwdIt2 copy_n(FwdIt1 first1, Size count, FwdIt2 first2) noexcept
+{
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Copy<FwdIt1, FwdIt2> op{static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::copy_n(first1, count, first2);
+}
+
 template <class FwdIt, class T>
 void replace(FwdIt first, FwdIt last, const T &old_val, const T &new_val) noexcept
 {

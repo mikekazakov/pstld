@@ -372,14 +372,20 @@ template <class ExPo, class It1, class It2>
 execution::__enable_if_execution_policy<ExPo, It2>
 copy(ExPo &&, It1 first, It1 last, It2 result) noexcept
 {
-    return ::std::copy(first, last, result); // stub only
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::copy(first, last, result);
+    else
+        return ::std::copy(first, last, result);
 }
 
 template <class ExPo, class It1, class Size, class It2>
 execution::__enable_if_execution_policy<ExPo, It2>
 copy_n(ExPo &&, It1 first, Size count, It2 result) noexcept
 {
-    return ::std::copy_n(first, count, result); // stub only
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::copy_n(first, count, result);
+    else
+        return ::std::copy_n(first, count, result);
 }
 
 template <class ExPo, class It1, class It2, class Pred>

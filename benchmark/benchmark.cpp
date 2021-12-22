@@ -186,6 +186,23 @@ struct search { // 25.6.13
 };
 
 template <class ExPo>
+struct copy { // 25.7.1
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure(
+            [&] {
+                v1 = std::vector<double>(size, 42.);
+                v2 = std::vector<double>(size);
+            },
+            [&] {
+                std::copy(ExPo{}, v1.begin(), v1.end(), v2.begin());
+                noopt(v2);
+            });
+    }
+};
+
+template <class ExPo>
 struct transform { // 25.7.4
     auto operator()(size_t size)
     {
@@ -395,6 +412,7 @@ int main()
     results.emplace_back(record<benchmarks::mismatch>());
     results.emplace_back(record<benchmarks::equal>());
     results.emplace_back(record<benchmarks::search>());
+    results.emplace_back(record<benchmarks::copy>());
     results.emplace_back(record<benchmarks::transform>());
     results.emplace_back(record<benchmarks::replace>());
     results.emplace_back(record<benchmarks::fill>());
