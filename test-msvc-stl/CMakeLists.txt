@@ -10,7 +10,7 @@ add_custom_target(check-pstld-msvc
 set_target_properties(check-pstld-msvc PROPERTIES FOLDER "Tests/MSVC")
 
 set(UNIT_TESTS
-#   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_adjacent_difference/test.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_adjacent_difference/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_adjacent_find/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_all_of/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_count/test.cpp

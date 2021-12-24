@@ -717,6 +717,28 @@ transform_reduce(ExPo &&, It first, It last, T val, BinOp bop, UnOp uop) noexcep
         return ::pstld::internal::move_transform_reduce(first, last, std::move(val), bop, uop);
 }
 
+// 25.10.12 - adjacent_difference //////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+adjacent_difference(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::adjacent_difference(first1, last1, first2);
+    else
+        return ::std::adjacent_difference(first1, last1, first2);
+}
+
+template <class ExPo, class It1, class It2, class BinOp>
+execution::__enable_if_execution_policy<ExPo, It2>
+adjacent_difference(ExPo &&, It1 first1, It1 last1, It2 first2, BinOp op) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::adjacent_difference(first1, last1, first2, op);
+    else
+        return ::std::adjacent_difference(first1, last1, first2, op);
+}
+
 } // namespace std
 
 // a hack to suport running tests from LLVM's PSTL

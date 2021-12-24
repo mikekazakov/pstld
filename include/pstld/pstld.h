@@ -2143,4 +2143,60 @@ FwdIt2 swap_ranges(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     return std::swap_ranges(first1, last1, first2);
 }
 
+namespace internal {
+
+template <class It1, class It2, class BinOp>
+struct AdjacentDifference : Dispatchable<AdjacentDifference<It1, It2, BinOp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    BinOp m_op;
+
+    AdjacentDifference(size_t count, size_t chunks, It1 first1, It2 first2, BinOp op)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_op(op)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        auto i1 = p1.first;
+        auto i2 = std::next(p1.first);
+        while( true ) {
+            *p2.first = m_op(*i2, *i1);
+            if( i2 == p1.last )
+                break;
+            i1 = i2;
+            ++i2;
+            ++p2.first;
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class BinOp>
+FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp bop) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    if( count > 2 ) {
+        *first2 = *first1;
+        const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
+        try {
+            internal::AdjacentDifference<FwdIt1, FwdIt2, BinOp> op{
+                static_cast<size_t>(count - 1), chunks, first1, std::next(first2), bop};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return ::std::adjacent_difference(first1, last1, first2, bop);
+}
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    return ::pstld::adjacent_difference(first1, last1, first2, std::minus<>{});
+}
+
 } // namespace pstld

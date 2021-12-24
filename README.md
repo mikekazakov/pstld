@@ -77,7 +77,7 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 25.10.9 | std::inclusive_scan | ❌ | ❌
 25.10.10 | std::transform_exclusive_scan | ❌ | ❌
 25.10.11 | std::transform_inclusive_scan | ❌ | ❌
-25.10.12 | std::adjacent_difference | ❌ | ❌
+25.10.12 | std::adjacent_difference | ✅ | ✅
 25.11.3 | std::uninitialized_default_construct | ❌ | ❌
 | | std::uninitialized_default_construct_n | ❌ | ❌
 25.11.4 | std::uninitialized_value_construct | ❌ | ❌

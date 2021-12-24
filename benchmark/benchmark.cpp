@@ -379,6 +379,23 @@ struct transform_reduce { // 25.10.6
     }
 };
 
+template <class ExPo>
+struct adjacent_difference { // 25.10.12
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure(
+            [&] {
+                v1 = v2 = std::vector<double>(size);
+                std::iota(v1.begin(), v1.end(), 0.);
+            },
+            [&] {
+                std::adjacent_difference(ExPo{}, v1.begin(), v1.end(), v2.begin());
+                noopt(v2);
+            });
+    }
+};
+
 template <class T>
 static std::string demangle()
 {
@@ -442,6 +459,7 @@ int main()
     results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::reduce>());
     results.emplace_back(record<benchmarks::transform_reduce>());
+    results.emplace_back(record<benchmarks::adjacent_difference>());
 
     const auto max_name_len =
         std::max_element(results.begin(), results.end(), [](auto &a, auto &b) {
