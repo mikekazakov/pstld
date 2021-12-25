@@ -16,6 +16,8 @@ set_property(TARGET pstld PROPERTY CXX_STANDARD 17)
 
 add_subdirectory(benchmark)
 
-enable_testing()
-add_subdirectory(test-llvm-pstl)
-add_subdirectory(test-msvc-stl)
+if (BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(test-llvm-pstl)
+    add_subdirectory(test-msvc-stl)
+endif (BUILD_TESTING)
