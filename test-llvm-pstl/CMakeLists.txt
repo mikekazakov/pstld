@@ -52,7 +52,7 @@ foreach(_file IN LISTS UNIT_TESTS)
     set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS NO
                                                 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
     set_target_properties(${_target} PROPERTIES CXX_STANDARD 17)
-    set_target_properties(${_target} PROPERTIES COMPILE_FLAGS "-include${CMAKE_CURRENT_LIST_DIR}/../include/pstld/pstld.h")
+    set_target_properties(${_target} PROPERTIES COMPILE_FLAGS "-includepstld/pstld.h")
     target_compile_definitions(${_target} PRIVATE PSTLD_HACK_INTO_STD)
     set_target_properties(${_target} PROPERTIES FOLDER "Tests/LLVM")
     add_test(${_target} "${CMAKE_CURRENT_BINARY_DIR}/${_target}")

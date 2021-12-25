@@ -7,12 +7,11 @@ project(pstld VERSION 1.0
               LANGUAGES CXX)
 
 add_library(pstld
-  include/pstld/pstld.h
-  include/pstld/hack_into_std.h
-  src/pstld.cpp
+  pstld/pstld.h
+  pstld/pstld.cpp
 )
 
-target_include_directories(pstld PUBLIC include)
+target_include_directories(pstld PUBLIC .)
 set_property(TARGET pstld PROPERTY CXX_STANDARD 17)
 
 add_subdirectory(benchmark)
