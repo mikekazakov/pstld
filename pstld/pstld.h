@@ -207,14 +207,13 @@ struct Partition<It, false> {
         size_t leftover = count % chunks;
         It it = first;
         for( size_t i = 0; i != chunks; ++i ) {
-            auto first = it;
             auto diff = fraction;
             if( leftover != 0 ) {
                 ++diff;
                 --leftover;
             }
             auto last = std::next(it, diff);
-            segments[i] = {first, last};
+            segments[i] = {it, last};
             it = last;
         }
     }
@@ -1181,7 +1180,7 @@ struct IsSorted : Dispatchable<IsSorted<It, Cmp>> {
     std::atomic_bool m_done{false};
     bool m_result = true;
 
-    IsSorted(size_t count, size_t chunks, It first, It last, Cmp cmp)
+    IsSorted(size_t count, size_t chunks, It first, Cmp cmp)
         : m_partition(first, count, chunks), m_cmp(cmp)
     {
     }
@@ -1213,7 +1212,7 @@ bool is_sorted(FwdIt first, FwdIt last, Cmp cmp)
         if( chunks > 1 ) {
             try {
                 internal::IsSorted<FwdIt, Cmp> op{
-                    static_cast<size_t>(count - 1), chunks, first, last, cmp};
+                    static_cast<size_t>(count - 1), chunks, first, cmp};
                 op.dispatch_apply(chunks);
                 return op.m_result;
             } catch( const internal::parallelism_exception & ) {
