@@ -6,5 +6,5 @@ add_executable(benchmark
 
 target_link_libraries(benchmark PRIVATE pstld)
 set_property(TARGET benchmark PROPERTY CXX_STANDARD 17)
-set_target_properties(benchmark PROPERTIES COMPILE_FLAGS "-includepstld/pstld.h")
+set_target_properties(benchmark PROPERTIES COMPILE_FLAGS "-includepstld/pstld.h -Wall -Wextra -Wpedantic -Werror")
 target_compile_definitions(benchmark PRIVATE PSTLD_HACK_INTO_STD)
