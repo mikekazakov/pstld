@@ -1,3 +1,5 @@
+![Build Status](https://github.com/mikekazakov/pstld/actions/workflows/build.yml/badge.svg)
+
 # pstld
 Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 
