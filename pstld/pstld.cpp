@@ -6,7 +6,7 @@
 
 namespace pstld::internal {
 
-size_t max_hw_threads() noexcept
+PSTLD_INTERNAL_IMPL size_t max_hw_threads() noexcept
 {
     static const size_t threads = [] {
         int count;
@@ -17,27 +17,28 @@ size_t max_hw_threads() noexcept
     return threads;
 }
 
-void dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept
+PSTLD_INTERNAL_IMPL void
+dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept
 {
     ::dispatch_apply_f(iterations, DISPATCH_APPLY_AUTO, ctx, function);
 }
 
-void dispatch_async(void *ctx, void (*function)(void *)) noexcept
+PSTLD_INTERNAL_IMPL void dispatch_async(void *ctx, void (*function)(void *)) noexcept
 {
     ::dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ctx, function);
 }
 
-DispatchGroup::DispatchGroup() noexcept
+PSTLD_INTERNAL_IMPL DispatchGroup::DispatchGroup() noexcept
     : m_group(dispatch_group_create()), m_queue(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0))
 {
 }
 
-DispatchGroup::~DispatchGroup()
+PSTLD_INTERNAL_IMPL DispatchGroup::~DispatchGroup()
 {
     ::dispatch_release(static_cast<dispatch_group_t>(m_group));
 }
 
-void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept
+PSTLD_INTERNAL_IMPL void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept
 {
     ::dispatch_group_async_f(static_cast<dispatch_group_t>(m_group),
                              static_cast<dispatch_queue_t>(m_queue),
@@ -45,17 +46,17 @@ void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept
                              function);
 }
 
-void DispatchGroup::wait() noexcept
+PSTLD_INTERNAL_IMPL void DispatchGroup::wait() noexcept
 {
     ::dispatch_group_wait(static_cast<dispatch_group_t>(m_group), DISPATCH_TIME_FOREVER);
 }
 
-const char *parallelism_exception::what() const noexcept
+PSTLD_INTERNAL_IMPL const char *parallelism_exception::what() const noexcept
 {
     return "Failed to acquire resources to perform parallel computation";
 }
 
-void parallelism_exception::raise()
+PSTLD_INTERNAL_IMPL void parallelism_exception::raise()
 {
     throw parallelism_exception{};
 };

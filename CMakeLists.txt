@@ -18,6 +18,7 @@ add_subdirectory(benchmark)
 
 if (BUILD_TESTING)
     enable_testing()
+    add_subdirectory(test)
     add_subdirectory(test-llvm-pstl)
     add_subdirectory(test-msvc-stl)
 endif (BUILD_TESTING)

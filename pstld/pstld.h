@@ -14,11 +14,25 @@
 
 #if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
 #error PSTLD_INTERNAL_DO_HACK_INTO_STD can't be defined manually
-#endif
+#endif // defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
+
+#if defined(PSTLD_INTERNAL_HEADER_ONLY)
+#error PSTLD_INTERNAL_HEADER_ONLY can't be defined manually
+#endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
 
 #if defined(PSTLD_HACK_INTO_STD)
 #define PSTLD_INTERNAL_DO_HACK_INTO_STD
 #endif // defined(PSTLD_HACK_INTO_STD)
+
+#if defined(PSTLD_HEADER_ONLY)
+#define PSTLD_INTERNAL_HEADER_ONLY
+#endif // defined(PSTLD_HEADER_ONLY)
+
+#if defined(PSTLD_INTERNAL_HEADER_ONLY)
+#define PSTLD_INTERNAL_IMPL inline
+#else
+#define PSTLD_INTERNAL_IMPL
+#endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
 
 namespace pstld {
 
@@ -2208,6 +2222,10 @@ FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
 
 } // namespace pstld
 
+#if defined(PSTLD_INTERNAL_HEADER_ONLY)
+#include "pstld.cpp"
+#endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
+
 #if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
 
 namespace std {
@@ -2964,4 +2982,4 @@ struct __equal_value {
 
 } // namespace __pstl
 
-#endif
+#endif // defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
