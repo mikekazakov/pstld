@@ -10,4 +10,4 @@ add_custom_target(check-pstld-custom
 set_target_properties(check-pstld-custom PROPERTIES FOLDER "Tests/Custom")
 
 add_subdirectory(linked_objc)
-add_subdirectory(single_header)
+add_subdirectory(single_header_cpp)
