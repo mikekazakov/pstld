@@ -1,8 +1,8 @@
-set(_target "custom-single-header-cpp")
+set(_target "custom-linked-objcpp-noarc")
 
-add_executable(${_target} EXCLUDE_FROM_ALL test.cpp f.h f.cpp)
+add_executable(${_target} EXCLUDE_FROM_ALL test.mm)
 
-target_include_directories( ${_target} PRIVATE $<TARGET_PROPERTY:pstld,INCLUDE_DIRECTORIES>)
+target_link_libraries(${_target} PRIVATE pstld)
     
 set_target_properties(${_target} PROPERTIES
     FOLDER "Tests/Custom"

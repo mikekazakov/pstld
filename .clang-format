@@ -23,6 +23,7 @@ BraceWrapping:
 BreakStringLiterals: true
 FixNamespaceComments: true
 IndentCaseLabels: true
+IndentPPDirectives: BeforeHash
 SortIncludes: false
 SpaceBeforeParens: Never
 SpacesInConditionalStatement: true

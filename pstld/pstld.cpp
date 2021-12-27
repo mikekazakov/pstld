@@ -38,7 +38,9 @@ PSTLD_INTERNAL_IMPL DispatchGroup::DispatchGroup() noexcept
 
 PSTLD_INTERNAL_IMPL DispatchGroup::~DispatchGroup()
 {
+#if !defined(PSTLD_INTERNAL_ARC)
     ::dispatch_release(static_cast<dispatch_group_t>(m_group));
+#endif
 }
 
 PSTLD_INTERNAL_IMPL void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept

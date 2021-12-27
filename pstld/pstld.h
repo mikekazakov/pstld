@@ -1,5 +1,33 @@
 // Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #pragma once
+
+#if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD) || defined(PSTLD_INTERNAL_HEADER_ONLY) ||             \
+    defined(PSTLD_INTERNAL_IMPL) || defined(PSTLD_INTERNAL_ARC)
+    #error internal settings can't be defined manually
+#endif
+
+#if defined(PSTLD_HACK_INTO_STD)
+    #define PSTLD_INTERNAL_DO_HACK_INTO_STD
+#endif
+
+#if defined(PSTLD_HEADER_ONLY)
+    #define PSTLD_INTERNAL_HEADER_ONLY
+#endif
+
+#if defined(PSTLD_INTERNAL_HEADER_ONLY)
+    #define PSTLD_INTERNAL_IMPL inline
+#else
+    #define PSTLD_INTERNAL_IMPL
+#endif
+
+#if defined(PSTLD_INTERNAL_HEADER_ONLY) && __has_feature(objc_arc)
+    #define PSTLD_INTERNAL_ARC
+#endif
+
+#if defined(PSTLD_INTERNAL_HEADER_ONLY)
+    #include <dispatch/dispatch.h>
+#endif
+
 #include <algorithm>
 #include <numeric>
 #include <iterator>
@@ -11,28 +39,6 @@
 #include <cstddef>
 #include <thread>
 #include <type_traits>
-
-#if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
-#error PSTLD_INTERNAL_DO_HACK_INTO_STD can't be defined manually
-#endif // defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
-
-#if defined(PSTLD_INTERNAL_HEADER_ONLY)
-#error PSTLD_INTERNAL_HEADER_ONLY can't be defined manually
-#endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
-
-#if defined(PSTLD_HACK_INTO_STD)
-#define PSTLD_INTERNAL_DO_HACK_INTO_STD
-#endif // defined(PSTLD_HACK_INTO_STD)
-
-#if defined(PSTLD_HEADER_ONLY)
-#define PSTLD_INTERNAL_HEADER_ONLY
-#endif // defined(PSTLD_HEADER_ONLY)
-
-#if defined(PSTLD_INTERNAL_HEADER_ONLY)
-#define PSTLD_INTERNAL_IMPL inline
-#else
-#define PSTLD_INTERNAL_IMPL
-#endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
 
 namespace pstld {
 
@@ -58,8 +64,13 @@ public:
     void wait() noexcept;
 
 private:
+#if defined(PSTLD_INTERNAL_ARC)
+    __strong dispatch_group_t m_group;
+    __strong dispatch_queue_global_t m_queue;
+#else
     void *m_group;
     void *m_queue;
+#endif
 };
 
 template <class It>
@@ -2223,7 +2234,7 @@ FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
 } // namespace pstld
 
 #if defined(PSTLD_INTERNAL_HEADER_ONLY)
-#include "pstld.cpp"
+    #include "pstld.cpp"
 #endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
 
 #if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)

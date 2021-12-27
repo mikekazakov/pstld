@@ -1,6 +1,6 @@
-set(_target "custom-single-header-cpp")
+set(_target "custom-single-header-objcpp-noarc")
 
-add_executable(${_target} EXCLUDE_FROM_ALL test.cpp f.h f.cpp)
+add_executable(${_target} EXCLUDE_FROM_ALL test.mm f.h f.mm)
 
 target_include_directories( ${_target} PRIVATE $<TARGET_PROPERTY:pstld,INCLUDE_DIRECTORIES>)
     
