@@ -42,6 +42,12 @@
 
 namespace pstld {
 
+// To avoid ODR violations when NonARC and ARC builds are mixed together - the ARC symbols are
+// placed into a nested inline namespace.
+#if defined(PSTLD_INTERNAL_ARC)
+inline namespace arc {
+#endif
+
 namespace internal {
 
 inline constexpr size_t chunks_per_cpu = 8;
@@ -2230,6 +2236,10 @@ FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
 {
     return ::pstld::adjacent_difference(first1, last1, first2, std::minus<>{});
 }
+
+#if defined(PSTLD_INTERNAL_ARC)
+} // inline namespace arc
+#endif
 
 } // namespace pstld
 

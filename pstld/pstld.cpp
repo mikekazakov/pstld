@@ -4,7 +4,13 @@
 #include <sys/sysctl.h>
 #include <dispatch/dispatch.h>
 
-namespace pstld::internal {
+namespace pstld {
+
+#if defined(PSTLD_INTERNAL_ARC)
+inline namespace arc {
+#endif
+
+namespace internal {
 
 PSTLD_INTERNAL_IMPL size_t max_hw_threads() noexcept
 {
@@ -66,4 +72,10 @@ PSTLD_INTERNAL_IMPL void parallelism_exception::raise()
     throw parallelism_exception{};
 };
 
-} // namespace pstld::internal
+} // namespace internal
+
+#if defined(PSTLD_INTERNAL_ARC)
+} // inline namespace arc
+#endif
+
+} // namespace pstld

@@ -7,7 +7,8 @@ target_include_directories( ${_target} PRIVATE $<TARGET_PROPERTY:pstld,INCLUDE_D
 set_target_properties(${_target} PROPERTIES
     FOLDER "Tests/Custom"
     CXX_STANDARD 17
-    COMPILE_FLAGS "-Wall -Wextra -Wpedantic -Werror")
+    COMPILE_FLAGS "-Wall -Wextra -Wpedantic -Werror"
+    LINK_FLAGS "-fobjc-link-runtime")
 
 add_test(${_target} "${CMAKE_CURRENT_BINARY_DIR}/${_target}")
 
