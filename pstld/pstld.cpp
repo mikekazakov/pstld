@@ -20,7 +20,10 @@ PSTLD_INTERNAL_IMPL size_t max_hw_threads() noexcept
 PSTLD_INTERNAL_IMPL void
 dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-extension"
     ::dispatch_apply_f(iterations, DISPATCH_APPLY_AUTO, ctx, function);
+#pragma clang diagnostic pop
 }
 
 PSTLD_INTERNAL_IMPL void dispatch_async(void *ctx, void (*function)(void *)) noexcept
