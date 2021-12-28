@@ -190,47 +190,55 @@ struct ItRange {
     It last;
 };
 
-template <class It, bool IsRandomAccess = is_random_iterator_v<It>>
+template <class It, bool Forward = true, bool IsRandomAccess = is_random_iterator_v<It>>
 struct Partition;
 
-template <class It>
-struct Partition<It, true> {
+template <class It, bool Forward>
+struct Partition<It, Forward, true> {
     It base;
     size_t fraction;
     size_t leftover;
     size_t count;
-    Partition(It first, size_t count, size_t chunks)
+    Partition(It first, size_t count, size_t chunks) noexcept
         : base(first), fraction(count / chunks), leftover(count % chunks), count(count)
     {
     }
 
-    ItRange<It> at(size_t chunk_no)
+    ItRange<It> at(size_t chunk_no) const noexcept
     {
         if( leftover ) {
             if( chunk_no >= leftover ) {
                 const auto first =
-                    base + (fraction + 1) * leftover + fraction * (chunk_no - leftover);
-                const auto last = first + fraction;
+                    advance(base, (fraction + 1) * leftover + fraction * (chunk_no - leftover));
+                const auto last = advance(first, fraction);
                 return {first, last};
             }
             else {
-                const auto first = base + (fraction + 1) * chunk_no;
-                const auto last = first + fraction + 1;
+                const auto first = advance(base, (fraction + 1) * chunk_no);
+                const auto last = advance(first, fraction + 1);
                 return {first, last};
             }
         }
         else {
-            const auto first = base + fraction * chunk_no;
-            const auto last = first + fraction;
+            const auto first = advance(base, fraction * chunk_no);
+            const auto last = advance(first, fraction);
             return {first, last};
         }
     }
 
-    It end() { return base + count; }
+    It end() const noexcept { return base + count; }
+
+    static It advance(It it, size_t distance) noexcept
+    {
+        if constexpr( Forward )
+            return it + distance;
+        else
+            return it - distance;
+    }
 };
 
-template <class It>
-struct Partition<It, false> {
+template <class It, bool Forward>
+struct Partition<It, Forward, false> {
     parallelism_vector<ItRange<It>> segments;
     Partition(It first, size_t count, size_t chunks) : segments(chunks)
     {
@@ -243,15 +251,23 @@ struct Partition<It, false> {
                 ++diff;
                 --leftover;
             }
-            auto last = std::next(it, diff);
+            auto last = advance(it, diff);
             segments[i] = {it, last};
             it = last;
         }
     }
 
-    ItRange<It> at(size_t chunk_no) { return segments[chunk_no]; }
+    ItRange<It> at(size_t chunk_no) const noexcept { return segments[chunk_no]; }
 
-    It end() { return segments.back().last; }
+    It end() const noexcept { return segments.back().last; }
+
+    static It advance(It it, size_t distance) noexcept
+    {
+        if constexpr( Forward )
+            return std::next(it, distance);
+        else
+            return std::prev(it, distance);
+    }
 };
 
 template <class It, bool = is_random_iterator_v<It> &&can_be_atomic_v<It>>
@@ -2237,6 +2253,45 @@ FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     return ::pstld::adjacent_difference(first1, last1, first2, std::minus<>{});
 }
 
+namespace internal {
+
+template <class It>
+struct Reverse : Dispatchable<Reverse<It>> {
+    Partition<It> m_partition1;
+    Partition<It, false> m_partition2;
+
+    Reverse(size_t count, size_t chunks, It first, It last)
+        : m_partition1(first, count, chunks), m_partition2(std::prev(last), count, chunks)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        for( ; p1.first != p1.last; ++p1.first, --p2.first )
+            std::iter_swap(p1.first, p2.first);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt>
+void reverse(FwdIt first, FwdIt last) noexcept
+{
+    const auto count = std::distance(first, last);
+    if( count > 3 ) {
+        const auto chunks = internal::work_chunks_min_fraction_1(count / 2);
+        try {
+            internal::Reverse<FwdIt> op{static_cast<size_t>(count / 2), chunks, first, last};
+            op.dispatch_apply(chunks);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    ::std::reverse(first, last);
+}
+
 #if defined(PSTLD_INTERNAL_ARC)
 } // inline namespace arc
 #endif
@@ -2756,6 +2811,17 @@ execution::__enable_if_execution_policy<ExPo, It> generate_n(ExPo &&, It first, 
 {
     // stub only
     return ::std::generate_n(first, count, gen);
+}
+
+// 25.7.10 - reverse ///////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It>
+execution::__enable_if_execution_policy<ExPo, void> reverse(ExPo &&, It first, It last)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::reverse(first, last);
+    else
+        ::std::reverse(first, last);
 }
 
 // 25.8.2.1 - sort /////////////////////////////////////////////////////////////////////////////////

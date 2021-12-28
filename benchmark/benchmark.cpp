@@ -267,6 +267,23 @@ struct fill { // 25.7.6
 };
 
 template <class ExPo>
+struct reverse { // 25.7.10
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure(
+            [&] {
+                v = std::vector<double>(size);
+                std::iota(v.begin(), v.end(), 0.);
+            },
+            [&] {
+                std::reverse(ExPo{}, v.begin(), v.end());
+                noopt(v);
+            });
+    }
+};
+
+template <class ExPo>
 struct sort_Rnd { // 25.8.2.1, semi-random input
     auto operator()(size_t size)
     {
@@ -451,6 +468,7 @@ int main()
     results.emplace_back(record<benchmarks::transform>());
     results.emplace_back(record<benchmarks::replace>());
     results.emplace_back(record<benchmarks::fill>());
+    results.emplace_back(record<benchmarks::reverse>());
     results.emplace_back(record<benchmarks::sort_Rnd>());
     results.emplace_back(record<benchmarks::sort_Eq>());
     results.emplace_back(record<benchmarks::sort_Asc>());
