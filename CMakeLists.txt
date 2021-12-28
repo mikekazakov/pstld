@@ -14,10 +14,9 @@ add_library(pstld
 target_include_directories(pstld PUBLIC .)
 set_property(TARGET pstld PROPERTY CXX_STANDARD 17)
 
-add_subdirectory(benchmark)
-
 if (BUILD_TESTING)
     enable_testing()
+    add_subdirectory(benchmark)
     add_subdirectory(test)
     add_subdirectory(test-llvm-pstl)
     add_subdirectory(test-msvc-stl)

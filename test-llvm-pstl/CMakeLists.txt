@@ -49,11 +49,12 @@ foreach(_file IN LISTS UNIT_TESTS)
     add_executable(${_target} EXCLUDE_FROM_ALL "${_file}")
     target_include_directories(${_target} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test")
     target_link_libraries(${_target} PRIVATE pstld)
-    set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS NO
-                                                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    set_target_properties(${_target} PROPERTIES CXX_STANDARD 17)
-    set_target_properties(${_target} PROPERTIES COMPILE_FLAGS "-includepstld/pstld.h -Wall -Wextra -Wpedantic -Werror")
-    target_compile_definitions(${_target} PRIVATE PSTLD_HACK_INTO_STD)
+    set_target_properties(${_target} PROPERTIES
+        COMPILE_FLAGS"-includepstld/pstld.h -includetest-llvm-pstl/helpers.h -Wall -Wextra -Wpedantic -Werror"
+        CXX_STANDARD 17
+        CXX_EXTENSIONS NO
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+        COMPILE_DEFINITIONS PSTLD_HACK_INTO_STD )
     set_target_properties(${_target} PROPERTIES FOLDER "Tests/LLVM")
     add_test(${_target} "${CMAKE_CURRENT_BINARY_DIR}/${_target}")
     add_dependencies(pstld-build-llvm-tests ${_target})
