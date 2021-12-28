@@ -50,7 +50,7 @@ foreach(_file IN LISTS UNIT_TESTS)
     target_include_directories(${_target} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test")
     target_link_libraries(${_target} PRIVATE pstld)
     set_target_properties(${_target} PROPERTIES
-        COMPILE_FLAGS"-includepstld/pstld.h -includetest-llvm-pstl/helpers.h -Wall -Wextra -Wpedantic -Werror"
+        COMPILE_FLAGS "-includepstld/pstld.h -includetest-llvm-pstl/helpers.h -Wall -Wextra -Wpedantic -Werror"
         CXX_STANDARD 17
         CXX_EXTENSIONS NO
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
