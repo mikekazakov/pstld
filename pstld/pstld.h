@@ -369,6 +369,26 @@ struct Dispatchable {
 };
 
 template <class T>
+struct Dispatchable2 {
+    static void dispatch_first(void *ctx, size_t ind) noexcept
+    {
+        static_cast<T *>(ctx)->run_first(ind);
+    }
+    void dispatch_apply_first(size_t count) noexcept
+    {
+        internal::dispatch_apply(count, this, dispatch_first);
+    }
+    static void dispatch_second(void *ctx, size_t ind) noexcept
+    {
+        static_cast<T *>(ctx)->run_second(ind);
+    }
+    void dispatch_apply_second(size_t count) noexcept
+    {
+        internal::dispatch_apply(count, this, dispatch_second);
+    }
+};
+
+template <class T>
 struct CircularArray {
     static_assert(std::is_trivial_v<T>);
     static constexpr size_t default_log_size = 6;
@@ -2300,21 +2320,19 @@ template <class It, class BinOp, class R>
 R partial_reduce(It first, It last, BinOp reduce)
 {
     auto init = first++;
-    auto val = static_cast<R>(reduce(*init, *first));
-    ++first;
+    auto val = static_cast<R>(reduce(*init, *first++));
     for( ; first != last; ++first )
         val = reduce(std::move(val), *first);
     return val;
 }
 
 template <class It1, class It2, class BinOp, class T>
-struct InclusiveScan : Dispatchable<InclusiveScan<It1, It2, BinOp, T>> {
+struct InclusiveScan : Dispatchable2<InclusiveScan<It1, It2, BinOp, T>> {
     Partition<It1> m_partition1;
     Partition<It2> m_partition2;
     unitialized_array<T> m_reduced;
     BinOp m_op;
     T &m_init;
-    bool m_accumulated = false;
 
     InclusiveScan(size_t count, size_t chunks, It1 first1, It2 first2, BinOp op, T &init)
         : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
@@ -2322,24 +2340,24 @@ struct InclusiveScan : Dispatchable<InclusiveScan<It1, It2, BinOp, T>> {
     {
     }
 
-    void run(size_t ind) noexcept
+    void run_first(size_t ind) noexcept
     {
-        // two passes - pre-reduce and fill
+        // fill the reduced chunks
         auto p1 = m_partition1.at(ind);
-        if( m_accumulated == false ) {
-            // fill the reduced chunks
-            m_reduced.put(ind, partial_reduce<It1, BinOp, T>(p1.first, p1.last, m_op));
-        }
-        else {
-            // fill the output
-            auto p2 = m_partition2.at(ind);
-            auto val = ind == 0 ? static_cast<T>(m_op(m_init, *p1.first++))
-                                : static_cast<T>(m_op(std::move(m_reduced[ind - 1]), *p1.first++));
-            *p2.first++ = val;
-            for( ; p1.first != p1.last; ++p1.first, ++p2.first ) {
-                val = m_op(std::move(val), *p1.first);
-                *p2.first = val;
-            }
+        m_reduced.put(ind, partial_reduce<It1, BinOp, T>(p1.first, p1.last, m_op));
+    }
+
+    void run_second(size_t ind) noexcept
+    {
+        // fill the output
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        auto val = ind == 0 ? static_cast<T>(m_op(m_init, *p1.first++))
+                            : static_cast<T>(m_op(std::move(m_reduced[ind - 1]), *p1.first++));
+        *p2.first++ = val;
+        for( ; p1.first != p1.last; ++p1.first, ++p2.first ) {
+            val = m_op(std::move(val), *p1.first);
+            *p2.first = val;
         }
     }
 
@@ -2349,10 +2367,8 @@ struct InclusiveScan : Dispatchable<InclusiveScan<It1, It2, BinOp, T>> {
         auto first = m_reduced.begin();
         auto last = m_reduced.end();
         *first = m_op(m_init, std::move(*first));
-        auto prev = first++;
-        for( ; first != last; ++first, ++prev )
+        for( auto prev = first++; first != last; ++first, ++prev )
             *first = m_op(*prev, std::move(*first));
-        m_accumulated = true;
     }
 };
 
@@ -2367,9 +2383,9 @@ FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_o
         try {
             internal::InclusiveScan<FwdIt1, FwdIt2, BinOp, T> op{
                 static_cast<size_t>(count), chunks, first1, first2, reduce_op, val};
-            op.dispatch_apply(chunks);
+            op.dispatch_apply_first(chunks);
             op.accumulate();
-            op.dispatch_apply(chunks);
+            op.dispatch_apply_second(chunks);
             return op.m_partition2.end();
         } catch( const internal::parallelism_exception & ) {
         }
@@ -2394,9 +2410,9 @@ FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_o
                 std::next(first2),
                 reduce_op,
                 *first2};
-            op.dispatch_apply(chunks);
+            op.dispatch_apply_first(chunks);
             op.accumulate();
-            op.dispatch_apply(chunks);
+            op.dispatch_apply_second(chunks);
             return op.m_partition2.end();
         } catch( const internal::parallelism_exception & ) {
         }
