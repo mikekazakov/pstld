@@ -170,6 +170,8 @@ struct unitialized_array : parallelism_allocator<T> {
     T *begin() noexcept { return m_data; }
 
     T *end() noexcept { return m_data + m_size; }
+
+    T &operator[](size_t ind) noexcept { return m_data[ind]; }
 };
 
 template <class T>
@@ -2292,6 +2294,122 @@ void reverse(FwdIt first, FwdIt last) noexcept
     ::std::reverse(first, last);
 }
 
+namespace internal {
+
+template <class It, class BinOp, class R>
+R partial_reduce(It first, It last, BinOp reduce)
+{
+    auto init = first++;
+    auto val = static_cast<R>(reduce(*init, *first));
+    ++first;
+    for( ; first != last; ++first )
+        val = reduce(std::move(val), *first);
+    return val;
+}
+
+template <class It1, class It2, class BinOp, class T>
+struct InclusiveScan : Dispatchable<InclusiveScan<It1, It2, BinOp, T>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    unitialized_array<T> m_reduced;
+    BinOp m_op;
+    T &m_init;
+    bool m_accumulated = false;
+
+    InclusiveScan(size_t count, size_t chunks, It1 first1, It2 first2, BinOp op, T &init)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
+          m_reduced(chunks), m_op(op), m_init(init)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        // two passes - pre-reduce and fill
+        auto p1 = m_partition1.at(ind);
+        if( m_accumulated == false ) {
+            // fill the reduced chunks
+            m_reduced.put(ind, partial_reduce<It1, BinOp, T>(p1.first, p1.last, m_op));
+        }
+        else {
+            // fill the output
+            auto p2 = m_partition2.at(ind);
+            auto val = ind == 0 ? static_cast<T>(m_op(m_init, *p1.first++))
+                                : static_cast<T>(m_op(std::move(m_reduced[ind - 1]), *p1.first++));
+            *p2.first++ = val;
+            for( ; p1.first != p1.last; ++p1.first, ++p2.first ) {
+                val = m_op(std::move(val), *p1.first);
+                *p2.first = val;
+            }
+        }
+    }
+
+    void accumulate() noexcept
+    {
+        // reduce chunks serially
+        auto first = m_reduced.begin();
+        auto last = m_reduced.end();
+        *first = m_op(m_init, std::move(*first));
+        auto prev = first++;
+        for( ; first != last; ++first, ++prev )
+            *first = m_op(*prev, std::move(*first));
+        m_accumulated = true;
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class BinOp, class T>
+FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_op, T val) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_2(count);
+    if( chunks > 1 ) {
+        try {
+            internal::InclusiveScan<FwdIt1, FwdIt2, BinOp, T> op{
+                static_cast<size_t>(count), chunks, first1, first2, reduce_op, val};
+            op.dispatch_apply(chunks);
+            op.accumulate();
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return ::std::inclusive_scan(first1, last1, first2, reduce_op, std::move(val));
+}
+
+template <class FwdIt1, class FwdIt2, class BinOp>
+FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_op) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    if( count == 0 )
+        return first2;
+    const auto chunks = internal::work_chunks_min_fraction_2(count - 1);
+    if( chunks > 1 ) {
+        try {
+            *first2 = *first1;
+            internal::InclusiveScan<FwdIt1, FwdIt2, BinOp, internal::iterator_value_t<FwdIt1>> op{
+                static_cast<size_t>(count - 1),
+                chunks,
+                std::next(first1),
+                std::next(first2),
+                reduce_op,
+                *first2};
+            op.dispatch_apply(chunks);
+            op.accumulate();
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return ::std::inclusive_scan(first1, last1, first2, reduce_op);
+}
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    return ::pstld::inclusive_scan(first1, last1, first2, ::std::plus<>{});
+}
+
 #if defined(PSTLD_INTERNAL_ARC)
 } // inline namespace arc
 #endif
@@ -3025,6 +3143,56 @@ transform_reduce(ExPo &&, It first, It last, T val, BinOp bop, UnOp uop) noexcep
         return ::pstld::transform_reduce(first, last, std::move(val), bop, uop);
     else
         return ::pstld::internal::move_transform_reduce(first, last, std::move(val), bop, uop);
+}
+
+// 25.10.8 - exclusive_scan ////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2, class T>
+execution::__enable_if_execution_policy<ExPo, It2>
+exclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, T val) noexcept
+{
+    // dummy for now
+    return ::std::exclusive_scan(first1, last1, first2, std::move(val));
+}
+
+template <class ExPo, class It1, class It2, class T, class BinOp>
+execution::__enable_if_execution_policy<ExPo, It2>
+exclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, T val, BinOp bop) noexcept
+{
+    // dummy for now
+    return ::std::exclusive_scan(first1, last1, first2, std::move(val), bop);
+}
+
+// 25.10.9 - inclusive_scan ////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2, class BinOp, class T>
+execution::__enable_if_execution_policy<ExPo, It2>
+inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, BinOp bop, T val) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::inclusive_scan(first1, last1, first2, bop, std::move(val));
+    else
+        return ::std::inclusive_scan(first1, last1, first2, bop, std::move(val));
+}
+
+template <class ExPo, class It1, class It2, class BinOp>
+execution::__enable_if_execution_policy<ExPo, It2>
+inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, BinOp bop) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::inclusive_scan(first1, last1, first2, bop);
+    else
+        return ::std::inclusive_scan(first1, last1, first2, bop);
+}
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::inclusive_scan(first1, last1, first2);
+    else
+        return ::std::inclusive_scan(first1, last1, first2);
 }
 
 // 25.10.12 - adjacent_difference //////////////////////////////////////////////////////////////////
