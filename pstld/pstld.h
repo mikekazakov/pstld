@@ -2426,6 +2426,86 @@ FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     return ::pstld::inclusive_scan(first1, last1, first2, ::std::plus<>{});
 }
 
+namespace internal {
+
+template <class It1, class It2, class BinOp, class T>
+struct ExclusiveScan : Dispatchable2<ExclusiveScan<It1, It2, BinOp, T>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    unitialized_array<T> m_reduced;
+    BinOp m_op;
+    T &m_init;
+
+    ExclusiveScan(size_t count, size_t chunks, It1 first1, It2 first2, BinOp op, T &init)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
+          m_reduced(chunks), m_op(op), m_init(init)
+    {
+    }
+
+    void run_first(size_t ind) noexcept
+    {
+        // fill the reduced chunks
+        auto p1 = m_partition1.at(ind);
+        m_reduced.put(ind, partial_reduce<It1, BinOp, T>(p1.first, p1.last, m_op));
+    }
+
+    void run_second(size_t ind) noexcept
+    {
+        // fill the output
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        auto val = std::move(ind == 0 ? m_init : m_reduced[ind - 1]);
+        for( ; p1.first != p1.last; ++p1.first, ++p2.first ) {
+            auto next = m_op(val, *p1.first);
+            *p2.first = std::move(val);
+            val = std::move(next);
+        }
+    }
+
+    void accumulate() noexcept
+    {
+        // reduce chunks serially
+        auto first = m_reduced.begin();
+        auto last = m_reduced.end();
+        *first = m_op(m_init, std::move(*first));
+        for( auto prev = first++; first != last; ++first, ++prev )
+            *first = m_op(*prev, std::move(*first));
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class T, class BinOp>
+FwdIt2 exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinOp reduce_op) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    if( count == 0 )
+        return first2;
+    if( count == 1 ) {
+        *first2 = std::move(val);
+        return std::next(first2);
+    }
+    const auto chunks = internal::work_chunks_min_fraction_2(count);
+    if( chunks > 1 ) {
+        try {
+            internal::ExclusiveScan<FwdIt1, FwdIt2, BinOp, T> op{
+                static_cast<size_t>(count), chunks, first1, first2, reduce_op, val};
+            op.dispatch_apply_first(chunks);
+            op.accumulate();
+            op.dispatch_apply_second(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return ::std::exclusive_scan(first1, last1, first2, std::move(val), reduce_op);
+}
+
+template <class FwdIt1, class FwdIt2, class T>
+FwdIt2 exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val) noexcept
+{
+    return ::pstld::exclusive_scan(first1, last1, first2, std::move(val), ::std::plus<>{});
+}
+
 #if defined(PSTLD_INTERNAL_ARC)
 } // inline namespace arc
 #endif
@@ -3167,16 +3247,20 @@ template <class ExPo, class It1, class It2, class T>
 execution::__enable_if_execution_policy<ExPo, It2>
 exclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, T val) noexcept
 {
-    // dummy for now
-    return ::std::exclusive_scan(first1, last1, first2, std::move(val));
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::exclusive_scan(first1, last1, first2, std::move(val));
+    else
+        return ::std::exclusive_scan(first1, last1, first2, std::move(val));
 }
 
 template <class ExPo, class It1, class It2, class T, class BinOp>
 execution::__enable_if_execution_policy<ExPo, It2>
 exclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, T val, BinOp bop) noexcept
 {
-    // dummy for now
-    return ::std::exclusive_scan(first1, last1, first2, std::move(val), bop);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::exclusive_scan(first1, last1, first2, std::move(val), bop);
+    else
+        return ::std::exclusive_scan(first1, last1, first2, std::move(val), bop);
 }
 
 // 25.10.9 - inclusive_scan ////////////////////////////////////////////////////////////////////////

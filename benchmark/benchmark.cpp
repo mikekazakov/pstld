@@ -397,6 +397,23 @@ struct transform_reduce { // 25.10.6
 };
 
 template <class ExPo>
+struct exclusive_scan { // 25.10.8
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure(
+            [&] {
+                v1 = std::vector<double>(size, 1.01);
+                v2 = std::vector<double>(size);
+            },
+            [&] {
+                noopt(std::exclusive_scan(
+                    ExPo{}, v1.begin(), v1.end(), v2.begin(), 1.02, std::multiplies<>{}));
+            });
+    }
+};
+
+template <class ExPo>
 struct inclusive_scan { // 25.10.9
     auto operator()(size_t size)
     {
@@ -494,6 +511,7 @@ int main()
     results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::reduce>());
     results.emplace_back(record<benchmarks::transform_reduce>());
+    results.emplace_back(record<benchmarks::exclusive_scan>());
     results.emplace_back(record<benchmarks::inclusive_scan>());
     results.emplace_back(record<benchmarks::adjacent_difference>());
 
