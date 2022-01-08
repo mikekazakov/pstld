@@ -17,7 +17,7 @@ PSTLD_INTERNAL_IMPL size_t max_hw_threads() noexcept
     static const size_t threads = [] {
         int count;
         size_t count_len = sizeof(count);
-        sysctlbyname("hw.logicalcpu_max", &count, &count_len, nullptr, 0);
+        sysctlbyname("hw.physicalcpu_max", &count, &count_len, nullptr, 0);
         return static_cast<size_t>(count);
     }();
     return threads;
