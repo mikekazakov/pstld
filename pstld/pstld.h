@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
+// Copyright (c) Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #pragma once
 
 #if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD) || defined(PSTLD_INTERNAL_HEADER_ONLY) ||             \
@@ -47,6 +47,12 @@ namespace pstld {
 #if defined(PSTLD_INTERNAL_ARC)
 inline namespace arc {
 #endif
+
+//--------------------------------------------------------------------------------------------------
+//
+// Common facilities
+//
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -527,6 +533,12 @@ struct alignas(hardware_destructive_interference_size) WorkCounter {
 };
 
 } // namespace internal
+
+//--------------------------------------------------------------------------------------------------
+//
+// Algorithms implementation
+//
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -2512,9 +2524,101 @@ FwdIt2 exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val) noexcep
 
 } // namespace pstld
 
-#if defined(PSTLD_INTERNAL_HEADER_ONLY)
-    #include "pstld.cpp"
-#endif // defined(PSTLD_INTERNAL_HEADER_ONLY)
+//--------------------------------------------------------------------------------------------------
+//
+// System-specific implementation details
+//
+//--------------------------------------------------------------------------------------------------
+
+#if defined(PSTLD_INTERNAL_HEADER_ONLY) || defined(PSTLD_INTERNAL_IMPLEMENTATION_FILE)
+
+    #include <sys/types.h>
+    #include <sys/sysctl.h>
+    #include <dispatch/dispatch.h>
+
+namespace pstld {
+
+    #if defined(PSTLD_INTERNAL_ARC)
+inline namespace arc {
+    #endif
+
+namespace internal {
+
+PSTLD_INTERNAL_IMPL size_t max_hw_threads() noexcept
+{
+    static const size_t threads = [] {
+        int count;
+        size_t count_len = sizeof(count);
+        sysctlbyname("hw.physicalcpu_max", &count, &count_len, nullptr, 0);
+        return static_cast<size_t>(count);
+    }();
+    return threads;
+}
+
+PSTLD_INTERNAL_IMPL void
+dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept
+{
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wnullability-extension"
+    ::dispatch_apply_f(iterations, DISPATCH_APPLY_AUTO, ctx, function);
+    #pragma clang diagnostic pop
+}
+
+PSTLD_INTERNAL_IMPL void dispatch_async(void *ctx, void (*function)(void *)) noexcept
+{
+    ::dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ctx, function);
+}
+
+PSTLD_INTERNAL_IMPL DispatchGroup::DispatchGroup() noexcept
+    : m_group(dispatch_group_create()), m_queue(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0))
+{
+}
+
+PSTLD_INTERNAL_IMPL DispatchGroup::~DispatchGroup()
+{
+    #if !defined(PSTLD_INTERNAL_ARC)
+    ::dispatch_release(static_cast<dispatch_group_t>(m_group));
+    #endif
+}
+
+PSTLD_INTERNAL_IMPL void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept
+{
+    ::dispatch_group_async_f(static_cast<dispatch_group_t>(m_group),
+                             static_cast<dispatch_queue_t>(m_queue),
+                             ctx,
+                             function);
+}
+
+PSTLD_INTERNAL_IMPL void DispatchGroup::wait() noexcept
+{
+    ::dispatch_group_wait(static_cast<dispatch_group_t>(m_group), DISPATCH_TIME_FOREVER);
+}
+
+PSTLD_INTERNAL_IMPL const char *parallelism_exception::what() const noexcept
+{
+    return "Failed to acquire resources to perform parallel computation";
+}
+
+PSTLD_INTERNAL_IMPL void parallelism_exception::raise()
+{
+    throw parallelism_exception{};
+};
+
+} // namespace internal
+
+    #if defined(PSTLD_INTERNAL_ARC)
+} // inline namespace arc
+    #endif
+
+} // namespace pstld
+
+#endif // defined(PSTLD_INTERNAL_HEADER_ONLY) || defined(PSTLD_INTERNAL_IMPLEMENTATION_FILE)
+
+//--------------------------------------------------------------------------------------------------
+//
+// Injecting the shims into ::std
+//
+//--------------------------------------------------------------------------------------------------
 
 #if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
 
