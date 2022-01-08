@@ -32,10 +32,8 @@
 #include <numeric>
 #include <iterator>
 #include <vector>
-#include <deque>
 #include <limits>
 #include <mutex>
-#include <optional>
 #include <cstddef>
 #include <thread>
 #include <type_traits>
