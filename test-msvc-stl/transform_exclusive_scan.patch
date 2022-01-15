@@ -1,0 +1,12 @@
+diff --git a/tests/std/tests/P0024R2_parallel_algorithms_transform_exclusive_scan/test.cpp b/tests/std/tests/P0024R2_parallel_algorithms_transform_exclusive_scan/test.cpp
+index 256f613..0dda432 100644
+--- a/tests/std/tests/P0024R2_parallel_algorithms_transform_exclusive_scan/test.cpp
++++ b/tests/std/tests/P0024R2_parallel_algorithms_transform_exclusive_scan/test.cpp
+@@ -189,7 +189,6 @@ struct typesBop {
+ void test_case_transform_exclusive_scan_init_writes_intermediate_type() {
+     inputType input[2]{0, 0};
+     outputType output[2]{0, 0};
+-    transform_exclusive_scan(begin(input), end(input), output, intermediateType{0}, typesBop{}, transformUop{});
+     transform_exclusive_scan(par, begin(input), end(input), output, intermediateType{0}, typesBop{}, transformUop{});
+ }
+ 

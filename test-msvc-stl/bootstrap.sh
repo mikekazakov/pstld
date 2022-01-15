@@ -10,3 +10,4 @@ cd STL
 git sparse-checkout init --cone
 git sparse-checkout add tests
 git checkout
+git apply ../transform_exclusive_scan.patch

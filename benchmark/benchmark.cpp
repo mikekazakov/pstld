@@ -431,6 +431,50 @@ struct inclusive_scan { // 25.10.9
 };
 
 template <class ExPo>
+struct transform_exclusive_scan { // 25.10.10
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure(
+            [&] {
+                v1 = std::vector<double>(size, 1.01);
+                v2 = std::vector<double>(size);
+            },
+            [&] {
+                noopt(std::transform_exclusive_scan(ExPo{},
+                                                    v1.begin(),
+                                                    v1.end(),
+                                                    v2.begin(),
+                                                    1.02,
+                                                    std::multiplies<>{},
+                                                    [](double v) { return pow(v, 1.01); }));
+            });
+    }
+};
+
+template <class ExPo>
+struct transform_inclusive_scan { // 25.10.11
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure(
+            [&] {
+                v1 = std::vector<double>(size, 1.01);
+                v2 = std::vector<double>(size);
+            },
+            [&] {
+                noopt(std::transform_inclusive_scan(ExPo{},
+                                                    v1.begin(),
+                                                    v1.end(),
+                                                    v2.begin(),
+                                                    std::multiplies<>{},
+                                                    [](double v) { return pow(v, 1.01); },
+                                                    1.02));
+            });
+    }
+};
+
+template <class ExPo>
 struct adjacent_difference { // 25.10.12
     auto operator()(size_t size)
     {
@@ -513,6 +557,8 @@ int main()
     results.emplace_back(record<benchmarks::transform_reduce>());
     results.emplace_back(record<benchmarks::exclusive_scan>());
     results.emplace_back(record<benchmarks::inclusive_scan>());
+    results.emplace_back(record<benchmarks::transform_exclusive_scan>());
+    results.emplace_back(record<benchmarks::transform_inclusive_scan>());
     results.emplace_back(record<benchmarks::adjacent_difference>());
 
     const auto max_name_len =
