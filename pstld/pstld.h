@@ -2574,6 +2574,73 @@ FwdIt2 exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val) noexcep
     return ::pstld::exclusive_scan(first1, last1, first2, std::move(val), ::std::plus<>{});
 }
 
+namespace internal {
+
+template <class It1, class It2, class Cmp>
+struct LexicographicalCompare : Dispatchable<LexicographicalCompare<It1, It2, Cmp>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+    Cmp m_cmp;
+    MinIteratorResult<It1> m_result1;
+    MinIteratorResult<It2> m_result2;
+
+    LexicographicalCompare(size_t count, size_t chunks, It1 first1, It2 first2, Cmp cmp)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_cmp(cmp),
+          m_result1(m_partition1.end()), m_result2(m_partition2.end())
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( ind < m_result1.min_chunk ) {
+            auto p1 = m_partition1.at(ind);
+            auto p2 = m_partition2.at(ind);
+            for( ; p1.first != p1.last; ++p1.first, ++p2.first ) {
+                if( m_cmp(*p1.first, *p2.first) || m_cmp(*p2.first, *p1.first) ) {
+                    m_result1.put(ind, p1.first);
+                    m_result2.put(ind, p2.first);
+                    return;
+                }
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class Cmp>
+bool lexicographical_compare(FwdIt1 first1,
+                             FwdIt1 last1,
+                             FwdIt2 first2,
+                             FwdIt2 last2,
+                             Cmp cmp) noexcept
+{
+    const auto count1 = std::distance(first1, last1);
+    const auto count2 = std::distance(first2, last2);
+    const auto count_min = std::min(count1, count2);
+    const auto chunks = internal::work_chunks_min_fraction_1(count_min);
+    if( chunks > 1 ) {
+        try {
+            internal::LexicographicalCompare<FwdIt1, FwdIt2, Cmp> op{
+                static_cast<size_t>(count_min), chunks, first1, first2, cmp};
+            op.dispatch_apply(chunks);
+            if( static_cast<FwdIt1>(op.m_result1.min) != op.m_partition1.end() )
+                return cmp(*static_cast<FwdIt1>(op.m_result1.min),
+                           *static_cast<FwdIt2>(op.m_result2.min));
+            else
+                return count1 < count2;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return ::std::lexicographical_compare(first1, last1, first2, last2, cmp);
+}
+
+template <class FwdIt1, class FwdIt2>
+bool lexicographical_compare(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+{
+    return ::pstld::lexicographical_compare(first1, last1, first2, last2, std::less<>{});
+}
+
 #if defined(PSTLD_INTERNAL_ARC)
 } // inline namespace arc
 #endif
@@ -3329,6 +3396,28 @@ minmax_element(ExPo &&, It first, It last, Cmp cmp)
         return ::pstld::minmax_element(first, last, cmp);
     else
         return ::std::minmax_element(first, last, cmp);
+}
+
+// 25.8.11 - lexicographical_compare ///////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, bool>
+lexicographical_compare(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::lexicographical_compare(first1, last1, first2, last2);
+    else
+        return ::std::lexicographical_compare(first1, last1, first2, last2);
+}
+
+template <class ExPo, class It1, class It2, class Cmp>
+execution::__enable_if_execution_policy<ExPo, bool>
+lexicographical_compare(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Cmp cmp) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::lexicographical_compare(first1, last1, first2, last2, cmp);
+    else
+        return ::std::lexicographical_compare(first1, last1, first2, last2, cmp);
 }
 
 // 25.10.4 - reduce ////////////////////////////////////////////////////////////////////////////////

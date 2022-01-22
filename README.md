@@ -72,7 +72,7 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 25.8.9 | std::min_element | ✅ | ✅
 | | std::max_element | ✅ | ✅
 | | std::minmax_element | ✅ | ✅
-25.8.11 | std::lexicographical_compare | ❌ | ❌
+25.8.11 | std::lexicographical_compare | ✅ | ✅
 25.10.4 | std::reduce | ✅ | ✅
 25.10.6 | std::transform_reduce | ✅ | ✅
 25.10.8 | std::exclusive_scan | ✅ | ✅

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
+// Copyright (c) Michael G. Kazakov. All rights reserved. Distributed under the MIT License.
 #include <cstddef>
 #include <cstdio>
 #include <algorithm>
@@ -373,6 +373,19 @@ struct minmax_element { // 25.8.9
 };
 
 template <class ExPo>
+struct lexicographical_compare { // 25.8.11
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2;
+        return measure([&] { v1 = v2 = std::vector<double>(size, 42.); },
+                       [&] {
+                           noopt(std::lexicographical_compare(
+                               ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end()));
+                       });
+    }
+};
+
+template <class ExPo>
 struct reduce { // 25.10.4
     auto operator()(size_t size)
     {
@@ -463,13 +476,14 @@ struct transform_inclusive_scan { // 25.10.11
                 v2 = std::vector<double>(size);
             },
             [&] {
-                noopt(std::transform_inclusive_scan(ExPo{},
-                                                    v1.begin(),
-                                                    v1.end(),
-                                                    v2.begin(),
-                                                    std::multiplies<>{},
-                                                    [](double v) { return pow(v, 1.01); },
-                                                    1.02));
+                noopt(std::transform_inclusive_scan(
+                    ExPo{},
+                    v1.begin(),
+                    v1.end(),
+                    v2.begin(),
+                    std::multiplies<>{},
+                    [](double v) { return pow(v, 1.01); },
+                    1.02));
             });
     }
 };
@@ -553,6 +567,7 @@ int main()
     results.emplace_back(record<benchmarks::sort_Des>());
     results.emplace_back(record<benchmarks::is_sorted>());
     results.emplace_back(record<benchmarks::minmax_element>());
+    results.emplace_back(record<benchmarks::lexicographical_compare>());
     results.emplace_back(record<benchmarks::reduce>());
     results.emplace_back(record<benchmarks::transform_reduce>());
     results.emplace_back(record<benchmarks::exclusive_scan>());
