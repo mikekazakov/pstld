@@ -1,0 +1,12 @@
+diff --git a/pstl/test/std/algorithms/alg.sorting/is_sorted.pass.cpp b/pstl/test/std/algorithms/alg.sorting/is_sorted.pass.cpp
+index d4c6fe2..9f3ae50 100644
+--- a/pstl/test/std/algorithms/alg.sorting/is_sorted.pass.cpp
++++ b/pstl/test/std/algorithms/alg.sorting/is_sorted.pass.cpp
+@@ -28,6 +28,7 @@ struct test_is_sorted
+         typedef typename std::iterator_traits<Iterator>::value_type T;
+ 
+         //try random-access iterator
++        exam = is_sorted(first, last);
+         bool res = is_sorted(exec, first, last);
+         EXPECT_TRUE(exam == res, "is_sorted wrong result for random-access iterator");
+         auto iexam = is_sorted_until(first, last);
