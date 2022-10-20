@@ -363,6 +363,23 @@ struct is_sorted { // 25.8.2.5
 };
 
 template <class ExPo>
+struct merge { // 25.8.6
+    auto operator()(size_t size)
+    {
+        std::vector<double> v1, v2, v3;
+        return measure(
+            [&] {
+                v1 = std::vector<double>(size);
+                v2 = std::vector<double>(size);
+                v3 = std::vector<double>(size+size);
+                std::iota(v1.begin(), v1.end(), 0.);
+                std::iota(v2.begin(), v2.end(), 0.);
+            },
+            [&] { noopt(std::merge(ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end(), v3.begin())); });
+    }
+};
+
+template <class ExPo>
 struct minmax_element { // 25.8.9
     auto operator()(size_t size)
     {
@@ -566,6 +583,7 @@ int main()
     results.emplace_back(record<benchmarks::sort_Asc>());
     results.emplace_back(record<benchmarks::sort_Des>());
     results.emplace_back(record<benchmarks::is_sorted>());
+    results.emplace_back(record<benchmarks::merge>());
     results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::lexicographical_compare>());
     results.emplace_back(record<benchmarks::reduce>());

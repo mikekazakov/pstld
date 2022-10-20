@@ -36,6 +36,7 @@ set(UNIT_TESTS
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.sorting/sort.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.sorting/alg.lex.comparison/lexicographical_compare.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.sorting/alg.min.max/minmax_element.pass.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/algorithms/alg.merge/merge.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/adjacent_difference.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/reduce.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/scan.pass.cpp

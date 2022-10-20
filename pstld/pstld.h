@@ -56,6 +56,7 @@ namespace internal {
 
 inline constexpr size_t chunks_per_cpu = 8;
 inline constexpr size_t insertion_sort_limit = 32;
+inline constexpr size_t merge_parallel_limit = 8192;
 inline constexpr size_t hardware_destructive_interference_size = 128; // or 64 on x86
 
 size_t max_hw_threads() noexcept;
@@ -214,8 +215,7 @@ struct Partition<It, Forward, true> {
     {
         if( leftover ) {
             if( chunk_no >= leftover ) {
-                const auto first =
-                    advance(base, (fraction + 1) * leftover + fraction * (chunk_no - leftover));
+                const auto first = advance(base, (fraction + 1) * leftover + fraction * (chunk_no - leftover));
                 const auto last = advance(first, fraction);
                 return {first, last};
             }
@@ -327,10 +327,7 @@ struct MaxIteratorResult<It, true> {
     std::atomic<It> max;
     It last;
 
-    MaxIteratorResult(It last)
-        : max_chunk{std::numeric_limits<size_t>::max()}, max{last}, last(last)
-    {
-    }
+    MaxIteratorResult(It last) : max_chunk{std::numeric_limits<size_t>::max()}, max{last}, last(last) {}
 
     void put(size_t chunk, It it)
     {
@@ -374,22 +371,10 @@ struct Dispatchable {
 
 template <class T>
 struct Dispatchable2 {
-    static void dispatch_first(void *ctx, size_t ind) noexcept
-    {
-        static_cast<T *>(ctx)->run_first(ind);
-    }
-    void dispatch_apply_first(size_t count) noexcept
-    {
-        internal::dispatch_apply(count, this, dispatch_first);
-    }
-    static void dispatch_second(void *ctx, size_t ind) noexcept
-    {
-        static_cast<T *>(ctx)->run_second(ind);
-    }
-    void dispatch_apply_second(size_t count) noexcept
-    {
-        internal::dispatch_apply(count, this, dispatch_second);
-    }
+    static void dispatch_first(void *ctx, size_t ind) noexcept { static_cast<T *>(ctx)->run_first(ind); }
+    void dispatch_apply_first(size_t count) noexcept { internal::dispatch_apply(count, this, dispatch_first); }
+    static void dispatch_second(void *ctx, size_t ind) noexcept { static_cast<T *>(ctx)->run_second(ind); }
+    void dispatch_apply_second(size_t count) noexcept { internal::dispatch_apply(count, this, dispatch_second); }
 };
 
 template <class T>
@@ -548,8 +533,7 @@ struct TransformReduce : Dispatchable<TransformReduce<It, T, BinOp, UnOp>> {
     UnOp m_transform;
 
     TransformReduce(size_t count, size_t chunks, It first, BinOp reduce_op, UnOp transform_op)
-        : m_partition(first, count, chunks), m_results(chunks), m_reduce(reduce_op),
-          m_transform(transform_op)
+        : m_partition(first, count, chunks), m_results(chunks), m_reduce(reduce_op), m_transform(transform_op)
     {
     }
 
@@ -597,8 +581,7 @@ T transform_reduce(FwdIt first, FwdIt last, T val, BinOp reduce_op, UnOp transfo
             internal::TransformReduce<FwdIt, T, BinOp, UnOp> op{
                 static_cast<size_t>(count), chunks, first, reduce_op, transform_op};
             op.dispatch_apply(chunks);
-            return internal::move_reduce(
-                op.m_results.begin(), op.m_results.end(), std::move(val), reduce_op);
+            return internal::move_reduce(op.m_results.begin(), op.m_results.end(), std::move(val), reduce_op);
         } catch( const internal::parallelism_exception & ) {
         }
     }
@@ -615,8 +598,7 @@ internal::iterator_value_t<It> reduce(It first, It last) noexcept
 template <class It, class T>
 T reduce(It first, It last, T val) noexcept
 {
-    return ::pstld::transform_reduce(
-        first, last, std::move(val), std::plus<>{}, ::pstld::internal::no_op{});
+    return ::pstld::transform_reduce(first, last, std::move(val), std::plus<>{}, ::pstld::internal::no_op{});
 }
 
 template <class It, class T, class BinOp>
@@ -635,14 +617,9 @@ struct TransformReduce2 : Dispatchable<TransformReduce2<It1, It2, T, BinRedOp, B
     BinRedOp m_reduce;
     BinTrOp m_transform;
 
-    TransformReduce2(size_t count,
-                     size_t chunks,
-                     It1 first1,
-                     It2 first2,
-                     BinRedOp reduce_op,
-                     BinTrOp transform_op)
-        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
-          m_results(chunks), m_reduce(reduce_op), m_transform(transform_op)
+    TransformReduce2(size_t count, size_t chunks, It1 first1, It2 first2, BinRedOp reduce_op, BinTrOp transform_op)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_results(chunks),
+          m_reduce(reduce_op), m_transform(transform_op)
     {
     }
 
@@ -675,12 +652,7 @@ T move_transform_reduce(It1 first1, It1 last1, It2 first2, T val, BinOp reduce, 
 } // namespace internal
 
 template <class FwdIt1, class FwdIt2, class T, class BinRedOp, class BinTrOp>
-T transform_reduce(FwdIt1 first1,
-                   FwdIt1 last1,
-                   FwdIt2 first2,
-                   T val,
-                   BinRedOp reduce_op,
-                   BinTrOp transform_op) noexcept
+T transform_reduce(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinRedOp reduce_op, BinTrOp transform_op) noexcept
 {
     const auto count = std::distance(first1, last1);
     const auto chunks = internal::work_chunks_min_fraction_2(count);
@@ -689,20 +661,17 @@ T transform_reduce(FwdIt1 first1,
             internal::TransformReduce2<FwdIt1, FwdIt2, T, BinRedOp, BinTrOp> op{
                 static_cast<size_t>(count), chunks, first1, first2, reduce_op, transform_op};
             op.dispatch_apply(chunks);
-            return internal::move_reduce(
-                op.m_results.begin(), op.m_results.end(), std::move(val), reduce_op);
+            return internal::move_reduce(op.m_results.begin(), op.m_results.end(), std::move(val), reduce_op);
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    return internal::move_transform_reduce(
-        first1, last1, first2, std::move(val), reduce_op, transform_op);
+    return internal::move_transform_reduce(first1, last1, first2, std::move(val), reduce_op, transform_op);
 }
 
 template <class It1, class It2, class T>
 T transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
 {
-    return ::pstld::transform_reduce(
-        first1, last1, first2, std::move(val), std::plus<>{}, std::multiplies<>{});
+    return ::pstld::transform_reduce(first1, last1, first2, std::move(val), std::plus<>{}, std::multiplies<>{});
 }
 
 namespace internal {
@@ -714,10 +683,7 @@ struct AllOf : Dispatchable<AllOf<It, UnPred, Expected, Init>> {
     std::atomic_bool m_done{false};
     bool m_result = Init;
 
-    AllOf(size_t count, size_t chunks, It first, UnPred pred)
-        : m_partition(first, count, chunks), m_pred(pred)
-    {
-    }
+    AllOf(size_t count, size_t chunks, It first, UnPred pred) : m_partition(first, count, chunks), m_pred(pred) {}
 
     void run(size_t ind) noexcept
     {
@@ -741,8 +707,7 @@ bool all_of(FwdIt first, FwdIt last, UnPred pred) noexcept
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::AllOf<FwdIt, UnPred, true, true> op{
-                static_cast<size_t>(count), chunks, first, pred};
+            internal::AllOf<FwdIt, UnPred, true, true> op{static_cast<size_t>(count), chunks, first, pred};
             op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
@@ -758,8 +723,7 @@ bool none_of(FwdIt first, FwdIt last, UnPred pred) noexcept
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::AllOf<FwdIt, UnPred, false, true> op{
-                static_cast<size_t>(count), chunks, first, pred};
+            internal::AllOf<FwdIt, UnPred, false, true> op{static_cast<size_t>(count), chunks, first, pred};
             op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
@@ -775,8 +739,7 @@ bool any_of(FwdIt first, FwdIt last, UnPred pred) noexcept
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::AllOf<FwdIt, UnPred, false, false> op{
-                static_cast<size_t>(count), chunks, first, pred};
+            internal::AllOf<FwdIt, UnPred, false, false> op{static_cast<size_t>(count), chunks, first, pred};
             op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
@@ -792,10 +755,7 @@ struct ForEach : Dispatchable<ForEach<It, Func>> {
     Partition<It> m_partition;
     Func m_func;
 
-    ForEach(size_t count, size_t chunks, It first, Func func)
-        : m_partition(first, count, chunks), m_func(func)
-    {
-    }
+    ForEach(size_t count, size_t chunks, It first, Func func) : m_partition(first, count, chunks), m_func(func) {}
 
     void run(size_t ind) noexcept
     {
@@ -845,10 +805,7 @@ struct Count : Dispatchable<Count<It, Pred>> {
     Pred m_pred;
     std::atomic<iterator_diff_t<It>> m_result{};
 
-    Count(size_t count, size_t chunks, It first, Pred pred)
-        : m_partition(first, count, chunks), m_pred(pred)
-    {
-    }
+    Count(size_t count, size_t chunks, It first, Pred pred) : m_partition(first, count, chunks), m_pred(pred) {}
 
     void run(size_t ind) noexcept
     {
@@ -860,8 +817,7 @@ struct Count : Dispatchable<Count<It, Pred>> {
 } // namespace internal
 
 template <class FwdIt, class Pred>
-typename std::iterator_traits<FwdIt>::difference_type
-count_if(FwdIt first, FwdIt last, Pred pred) noexcept
+typename std::iterator_traits<FwdIt>::difference_type count_if(FwdIt first, FwdIt last, Pred pred) noexcept
 {
     const auto count = std::distance(first, last);
     const auto chunks = internal::work_chunks_min_fraction_1(count);
@@ -877,11 +833,9 @@ count_if(FwdIt first, FwdIt last, Pred pred) noexcept
 }
 
 template <class FwdIt, class T>
-typename std::iterator_traits<FwdIt>::difference_type
-count(FwdIt first, FwdIt last, const T &value) noexcept
+typename std::iterator_traits<FwdIt>::difference_type count(FwdIt first, FwdIt last, const T &value) noexcept
 {
-    return ::pstld::count_if(
-        first, last, [&value](const auto &iter_value) { return iter_value == value; });
+    return ::pstld::count_if(first, last, [&value](const auto &iter_value) { return iter_value == value; });
 }
 
 namespace internal {
@@ -929,23 +883,20 @@ FwdIt find_if(FwdIt first, FwdIt last, Pred pred) noexcept
 template <class FwdIt, class T>
 FwdIt find(FwdIt first, FwdIt last, const T &value) noexcept
 {
-    return ::pstld::find_if(
-        first, last, [&value](const auto &iter_value) { return iter_value == value; });
+    return ::pstld::find_if(first, last, [&value](const auto &iter_value) { return iter_value == value; });
 }
 
 template <class FwdIt, class Pred>
 FwdIt find_if_not(FwdIt first, FwdIt last, Pred pred) noexcept
 {
-    return ::pstld::find_if(
-        first, last, [&pred](const auto &value) { return !static_cast<bool>(pred(value)); });
+    return ::pstld::find_if(first, last, [&pred](const auto &value) { return !static_cast<bool>(pred(value)); });
 }
 
 template <class FwdIt1, class FwdIt2>
 FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
-    return ::pstld::find_if(first1, last1, [first2, last2](const auto &value) {
-        return std::find(first2, last2, value) != last2;
-    });
+    return ::pstld::find_if(
+        first1, last1, [first2, last2](const auto &value) { return std::find(first2, last2, value) != last2; });
 }
 
 template <class FwdIt1, class FwdIt2, class Pred>
@@ -996,8 +947,7 @@ FwdIt adjacent_find(FwdIt first, FwdIt last, Pred pred) noexcept
         const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
         if( chunks > 1 ) {
             try {
-                internal::AdjacentFind<FwdIt, Pred> op{
-                    static_cast<size_t>(count - 1), chunks, first, last, pred};
+                internal::AdjacentFind<FwdIt, Pred> op{static_cast<size_t>(count - 1), chunks, first, last, pred};
                 op.dispatch_apply(chunks);
                 return op.m_result.min;
             } catch( const internal::parallelism_exception & ) {
@@ -1010,8 +960,7 @@ FwdIt adjacent_find(FwdIt first, FwdIt last, Pred pred) noexcept
 template <class FwdIt>
 FwdIt adjacent_find(FwdIt first, FwdIt last) noexcept
 {
-    return ::pstld::adjacent_find(
-        first, last, [](const auto &v1, const auto &v2) { return v1 == v2; });
+    return ::pstld::adjacent_find(first, last, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 
 namespace internal {
@@ -1025,8 +974,7 @@ struct Search : Dispatchable<Search<It1, It2, Pred>> {
     It2 m_last2;
 
     Search(size_t count, size_t chunks, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred)
-        : m_partition(first1, count, chunks), m_result{last1}, m_pred(pred), m_first2(first2),
-          m_last2(last2)
+        : m_partition(first1, count, chunks), m_result{last1}, m_pred(pred), m_first2(first2), m_last2(last2)
     {
     }
 
@@ -1079,8 +1027,7 @@ FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred pre
 template <class FwdIt1, class FwdIt2>
 FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
-    return ::pstld::search(
-        first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
+    return ::pstld::search(first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 
 namespace internal {
@@ -1131,19 +1078,13 @@ FwdIt search_n(FwdIt first, FwdIt last, Size count2, const T &value, Pred pred) 
     if( static_cast<Size>(count1) < count2 )
         return last;
     if( static_cast<Size>(count1) == count2 )
-        return std::all_of(first, last, [&](const auto &v) { return pred(v, value); }) ? first
-                                                                                       : last;
+        return std::all_of(first, last, [&](const auto &v) { return pred(v, value); }) ? first : last;
 
     const auto count = count1 - count2 + 1;
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     try {
-        internal::SearchN<FwdIt, T, Pred> op{static_cast<size_t>(count),
-                                             chunks,
-                                             first,
-                                             last,
-                                             pred,
-                                             value,
-                                             static_cast<size_t>(count2)};
+        internal::SearchN<FwdIt, T, Pred> op{
+            static_cast<size_t>(count), chunks, first, last, pred, value, static_cast<size_t>(count2)};
         op.dispatch_apply(chunks);
         return op.m_result.min;
     } catch( const internal::parallelism_exception & ) {
@@ -1168,8 +1109,7 @@ struct FindEnd : Dispatchable<FindEnd<It1, It2, Pred>> {
     It2 m_last2;
 
     FindEnd(size_t count, size_t chunks, It1 first1, It1 last1, It2 first2, It2 last2, Pred pred)
-        : m_partition(first1, count, chunks), m_result{last1}, m_pred(pred), m_first2(first2),
-          m_last2(last2)
+        : m_partition(first1, count, chunks), m_result{last1}, m_pred(pred), m_first2(first2), m_last2(last2)
     {
     }
 
@@ -1246,8 +1186,7 @@ FwdIt1 find_end(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Pred p
 template <class FwdIt1, class FwdIt2>
 FwdIt1 find_end(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
-    return ::pstld::find_end(
-        first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
+    return ::pstld::find_end(first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 
 namespace internal {
@@ -1259,10 +1198,7 @@ struct IsSorted : Dispatchable<IsSorted<It, Cmp>> {
     std::atomic_bool m_done{false};
     bool m_result = true;
 
-    IsSorted(size_t count, size_t chunks, It first, Cmp cmp)
-        : m_partition(first, count, chunks), m_cmp(cmp)
-    {
-    }
+    IsSorted(size_t count, size_t chunks, It first, Cmp cmp) : m_partition(first, count, chunks), m_cmp(cmp) {}
 
     void run(size_t ind) noexcept
     {
@@ -1290,8 +1226,7 @@ bool is_sorted(FwdIt first, FwdIt last, Cmp cmp)
         const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
         if( chunks > 1 ) {
             try {
-                internal::IsSorted<FwdIt, Cmp> op{
-                    static_cast<size_t>(count - 1), chunks, first, cmp};
+                internal::IsSorted<FwdIt, Cmp> op{static_cast<size_t>(count - 1), chunks, first, cmp};
                 op.dispatch_apply(chunks);
                 return op.m_result;
             } catch( const internal::parallelism_exception & ) {
@@ -1345,8 +1280,7 @@ FwdIt is_sorted_until(FwdIt first, FwdIt last, Cmp cmp)
         const auto chunks = internal::work_chunks_min_fraction_1(count - 1);
         if( chunks > 1 ) {
             try {
-                internal::IsSortedUntil<FwdIt, Cmp> op{
-                    static_cast<size_t>(count - 1), chunks, first, last, cmp};
+                internal::IsSortedUntil<FwdIt, Cmp> op{static_cast<size_t>(count - 1), chunks, first, last, cmp};
                 op.dispatch_apply(chunks);
                 return op.m_result.min;
             } catch( const internal::parallelism_exception & ) {
@@ -1563,16 +1497,15 @@ struct Transform3 : Dispatchable<Transform3<It1, It2, It3, BinOp>> {
     BinOp m_op;
 
     Transform3(size_t count, size_t chunks, It1 first1, It2 first2, It3 first3, BinOp op)
-        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
-          m_partition3(first3, count, chunks), m_op(op)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_partition3(first3, count, chunks),
+          m_op(op)
     {
     }
 
     void run(size_t ind) noexcept
     {
         auto p = m_partition1.at(ind);
-        std::transform(
-            p.first, p.last, m_partition2.at(ind).first, m_partition3.at(ind).first, m_op);
+        std::transform(p.first, p.last, m_partition2.at(ind).first, m_partition3.at(ind).first, m_op);
     }
 };
 
@@ -1595,8 +1528,7 @@ FwdIt2 transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, UnOp transform_op) 
 }
 
 template <class FwdIt1, class FwdIt2, class FwdIt3, class BinOp>
-FwdIt3
-transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt3 first3, BinOp transform_op) noexcept
+FwdIt3 transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt3 first3, BinOp transform_op) noexcept
 {
     const auto count = std::distance(first1, last1);
     const auto chunks = internal::work_chunks_min_fraction_1(count);
@@ -1649,8 +1581,7 @@ bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, Cmp cmp) noexcept
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::Equal<FwdIt1, FwdIt2, Cmp> op{
-                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            internal::Equal<FwdIt1, FwdIt2, Cmp> op{static_cast<size_t>(count), chunks, first1, first2, cmp};
             op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
@@ -1674,8 +1605,7 @@ bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) no
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::Equal<FwdIt1, FwdIt2, Cmp> op{
-                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            internal::Equal<FwdIt1, FwdIt2, Cmp> op{static_cast<size_t>(count), chunks, first1, first2, cmp};
             op.dispatch_apply(chunks);
             return op.m_result;
         } catch( const internal::parallelism_exception & ) {
@@ -1730,8 +1660,7 @@ std::pair<FwdIt1, FwdIt2> mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, C
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::Mismatch<FwdIt1, FwdIt2, Cmp> op{
-                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            internal::Mismatch<FwdIt1, FwdIt2, Cmp> op{static_cast<size_t>(count), chunks, first1, first2, cmp};
             op.dispatch_apply(chunks);
             return {op.m_result1.min, op.m_result2.min};
         } catch( const internal::parallelism_exception & ) {
@@ -1747,15 +1676,13 @@ std::pair<FwdIt1, FwdIt2> mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) n
 }
 
 template <class FwdIt1, class FwdIt2, class Cmp>
-std::pair<FwdIt1, FwdIt2>
-mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) noexcept
+std::pair<FwdIt1, FwdIt2> mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) noexcept
 {
     const auto count = std::min(std::distance(first1, last1), std::distance(first2, last2));
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::Mismatch<FwdIt1, FwdIt2, Cmp> op{
-                static_cast<size_t>(count), chunks, first1, first2, cmp};
+            internal::Mismatch<FwdIt1, FwdIt2, Cmp> op{static_cast<size_t>(count), chunks, first1, first2, cmp};
             op.dispatch_apply(chunks);
             return {op.m_result1.min, op.m_result2.min};
         } catch( const internal::parallelism_exception & ) {
@@ -1765,8 +1692,7 @@ mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) noex
 }
 
 template <class FwdIt1, class FwdIt2>
-std::pair<FwdIt1, FwdIt2>
-mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
+std::pair<FwdIt1, FwdIt2> mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
     return ::pstld::mismatch(first1, last1, first2, last2, std::equal_to<>{});
 }
@@ -1922,10 +1848,7 @@ struct Sort {
     parallelism_vector<CircularWorkStealingDeque<Work>> m_queues{m_workers};
     parallelism_vector<WorkCounter> m_work_counters{m_workers};
 
-    Sort(It first, It last, Cmp cmp)
-        : m_first(first), m_last(last), m_size(last - first), m_cmp(cmp)
-    {
-    }
+    Sort(It first, It last, Cmp cmp) : m_first(first), m_last(last), m_size(last - first), m_cmp(cmp) {}
 
     void start() noexcept
     {
@@ -2066,15 +1989,169 @@ void sort(RanIt first, RanIt last) noexcept
 
 namespace internal {
 
+template <class It1, class It2, class It3, class Cmp>
+struct Merge {
+    struct Work {
+        size_t first1;
+        size_t last1;
+        size_t first2;
+        size_t last2;
+        size_t first3;
+    };
+
+    It1 m_first1;
+    It1 m_last1;
+    size_t m_size1;
+    It2 m_first2;
+    It2 m_last2;
+    size_t m_size2;
+    It3 m_first3;
+    It3 m_last3;
+    size_t m_size3; // = m_size1 + m_size2
+    Cmp m_cmp;
+    DispatchGroup m_dg;
+    size_t m_workers{max_hw_threads()};
+    std::atomic<size_t> m_next_worker_index{1};
+    parallelism_vector<CircularWorkStealingDeque<Work>> m_queues{m_workers};
+    parallelism_vector<WorkCounter> m_work_counters{m_workers};
+
+    Merge(It1 first1, It1 last1, It2 first2, It2 last2, It3 first3, Cmp cmp)
+        : m_first1(first1), m_last1(last1), m_size1(last1 - first1), m_first2(first2), m_last2(last2),
+          m_size2(last2 - first2), m_first3(first3), m_last3(std::next(first3, m_size1 + m_size2)),
+          m_size3(m_size1 + m_size2), m_cmp(cmp)
+    {
+    }
+
+    void start() noexcept
+    {
+        m_queues[0].push_bottom(Work{0, m_size1, 0, m_size2, 0});
+        for( size_t i = 1; i != m_workers; ++i )
+            m_dg.dispatch(static_cast<void *>(this), dispatch);
+        dispatch_worker(0);
+        m_dg.wait();
+    }
+
+    void dispatch_worker(size_t worker_index) noexcept
+    {
+        Work w;
+        while( true ) {
+            if( m_queues[worker_index].pop_bottom(w) ) {
+                // have a local work to do
+                do_merge(w, worker_index);
+                continue;
+            }
+
+            for( size_t i = 1; i != m_workers; ++i ) {
+                size_t steal_index = (i + worker_index) % m_workers;
+                if( m_queues[steal_index].steal_top(w) ) {
+                    // stolen from an other queue
+                    do_merge(w, worker_index);
+                    continue;
+                }
+            }
+
+            // nothing to do - perhaps we are done?
+            if( is_done() )
+                break;
+
+            // give up execution
+            std::this_thread::yield();
+        }
+    }
+
+    void do_merge(const Work w, size_t worker_index) noexcept
+    {
+        size_t first1 = w.first1;
+        size_t last1 = w.last1;
+        size_t first2 = w.first2;
+        size_t last2 = w.last2;
+        size_t first3 = w.first3;
+        
+        while( (last1 - first1) + (last2 - first2) > merge_parallel_limit ) {
+            // chop the input in roughly halves while it's big enough
+            size_t mid1;
+            size_t mid2;
+            if( last1 - first1 < last2 - first2 ) {
+                mid2 = first2 + (last2 - first2) / 2;
+                mid1 = std::distance(m_first1,
+                                     std::lower_bound(m_first1 + first1, m_first1 + last1, *(m_first2 + mid2), m_cmp));
+            }
+            else {
+                mid1 = first1 + (last1 - first1) / 2;
+                mid2 = std::distance(m_first2,
+                                     std::lower_bound(m_first2 + first2, m_first2 + last2, *(m_first1 + mid1), m_cmp));
+            }
+
+            fork(worker_index, mid1, last1, mid2, last2, first3 + (mid1 - first1) + (mid2 - first2));
+            last1 = mid1;
+            last2 = mid2;
+        }
+
+        std::merge(m_first1 + first1, m_first1 + last1, m_first2 + first2, m_first2 + last2, m_first3 + first3, m_cmp);
+        m_work_counters[worker_index].commit_relaxed((last1 - first1) + (last2 - first2));
+    }
+
+    void fork(size_t worker_index, size_t first1, size_t last1, size_t first2, size_t last2, size_t first3) noexcept
+    {
+        try {
+            m_queues[worker_index].push_bottom(Work{first1, last1, first2, last2, first3});
+        } catch( const parallelism_exception & ) {
+            std::merge(
+                m_first1 + first1, m_first1 + last1, m_first2 + first2, m_first2 + last2, m_first3 + first3, m_cmp);
+            m_work_counters[worker_index].commit_relaxed((last1 - first1) + (last2 - first2));
+        }
+    }
+
+    bool is_done() noexcept
+    {
+        size_t done = 0;
+        for( size_t i = 0; i != m_workers; ++i )
+            done += m_work_counters[i].load_relaxed();
+        return done == m_size3;
+    }
+
+    static void dispatch(void *ctx) noexcept
+    {
+        auto me = static_cast<Merge *>(ctx);
+        size_t index = me->m_next_worker_index++;
+        me->dispatch_worker(index);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2, class FwdIt3, class Cmp>
+FwdIt3 merge(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, FwdIt3 first3, Cmp cmp) noexcept
+{
+    if constexpr( internal::is_random_iterator_v<FwdIt1> && internal::is_random_iterator_v<FwdIt2> &&
+                  internal::is_random_iterator_v<FwdIt3> ) {
+        const auto count = std::distance(first1, last1) + std::distance(first2, last2);
+        if( static_cast<size_t>(count) > internal::merge_parallel_limit ) {
+            try {
+                internal::Merge<FwdIt1, FwdIt2, FwdIt3, Cmp> merge(first1, last1, first2, last2, first3, cmp);
+                merge.start();
+                return merge.m_last3;
+            } catch( const internal::parallelism_exception & ) {
+            }
+        }
+    }
+    return std::merge(first1, last1, first2, last2, first3, cmp);
+}
+
+template <class FwdIt1, class FwdIt2, class FwdIt3>
+FwdIt3 merge(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, FwdIt3 first3) noexcept
+{
+    return ::pstld::merge(first1, last1, first2, last2, first3, std::less<>{});
+}
+
+namespace internal {
+
 template <class It, class T>
 struct Fill : Dispatchable<Fill<It, T>> {
     Partition<It> m_partition;
     T m_val;
 
-    Fill(size_t count, size_t chunks, It first, T val)
-        : m_partition(first, count, chunks), m_val(val)
-    {
-    }
+    Fill(size_t count, size_t chunks, It first, T val) : m_partition(first, count, chunks), m_val(val) {}
 
     void run(size_t ind) noexcept
     {
@@ -2100,7 +2177,6 @@ void fill(FwdIt first, FwdIt last, const T &val) noexcept
     }
     return std::fill(first, last, val);
 }
-
 template <class FwdIt, class Size, class T>
 FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
 {
@@ -2219,8 +2295,7 @@ FwdIt2 swap_ranges(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     const auto chunks = internal::work_chunks_min_fraction_1(count);
     if( chunks > 1 ) {
         try {
-            internal::SwapRanges<FwdIt1, FwdIt2> op{
-                static_cast<size_t>(count), chunks, first1, first2};
+            internal::SwapRanges<FwdIt1, FwdIt2> op{static_cast<size_t>(count), chunks, first1, first2};
             op.dispatch_apply(chunks);
             return op.m_partition2.end();
         } catch( const internal::parallelism_exception & ) {
@@ -2346,8 +2421,8 @@ struct InclusiveScan : Dispatchable2<InclusiveScan<It1, It2, BinOp, UnOp, T>> {
     T &m_init;
 
     InclusiveScan(size_t count, size_t chunks, It1 first1, It2 first2, BinOp op, UnOp tr, T &init)
-        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
-          m_reduced(chunks), m_op(op), m_tr(tr), m_init(init)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_reduced(chunks), m_op(op),
+          m_tr(tr), m_init(init)
     {
     }
 
@@ -2363,9 +2438,8 @@ struct InclusiveScan : Dispatchable2<InclusiveScan<It1, It2, BinOp, UnOp, T>> {
         // fill the output
         auto p1 = m_partition1.at(ind);
         auto p2 = m_partition2.at(ind);
-        auto val = ind == 0
-                       ? static_cast<T>(m_op(m_init, m_tr(*p1.first++)))
-                       : static_cast<T>(m_op(std::move(m_reduced[ind - 1]), m_tr(*p1.first++)));
+        auto val = ind == 0 ? static_cast<T>(m_op(m_init, m_tr(*p1.first++)))
+                            : static_cast<T>(m_op(std::move(m_reduced[ind - 1]), m_tr(*p1.first++)));
         *p2.first++ = val;
         for( ; p1.first != p1.last; ++p1.first, ++p2.first ) {
             val = m_op(std::move(val), m_tr(*p1.first));
@@ -2387,12 +2461,8 @@ struct InclusiveScan : Dispatchable2<InclusiveScan<It1, It2, BinOp, UnOp, T>> {
 } // namespace internal
 
 template <class FwdIt1, class FwdIt2, class BinOp, class UnOp, class T>
-FwdIt2 transform_inclusive_scan(FwdIt1 first1,
-                                FwdIt1 last1,
-                                FwdIt2 first2,
-                                BinOp reduce_op,
-                                UnOp transform_op,
-                                T val) noexcept
+FwdIt2
+transform_inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_op, UnOp transform_op, T val) noexcept
 {
     const auto count = std::distance(first1, last1);
     const auto chunks = internal::work_chunks_min_fraction_2(count);
@@ -2407,16 +2477,11 @@ FwdIt2 transform_inclusive_scan(FwdIt1 first1,
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    return ::std::transform_inclusive_scan(
-        first1, last1, first2, reduce_op, transform_op, std::move(val));
+    return ::std::transform_inclusive_scan(first1, last1, first2, reduce_op, transform_op, std::move(val));
 }
 
 template <class FwdIt1, class FwdIt2, class BinOp, class UnOp>
-FwdIt2 transform_inclusive_scan(FwdIt1 first1,
-                                FwdIt1 last1,
-                                FwdIt2 first2,
-                                BinOp reduce_op,
-                                UnOp transform_op) noexcept
+FwdIt2 transform_inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_op, UnOp transform_op) noexcept
 {
     const auto count = std::distance(first1, last1);
     if( count == 0 )
@@ -2425,14 +2490,14 @@ FwdIt2 transform_inclusive_scan(FwdIt1 first1,
     if( chunks > 1 ) {
         try {
             *first2 = transform_op(*first1);
-            internal::InclusiveScan<FwdIt1, FwdIt2, BinOp, UnOp, internal::iterator_value_t<FwdIt2>>
-                op{static_cast<size_t>(count - 1),
-                   chunks,
-                   std::next(first1),
-                   std::next(first2),
-                   reduce_op,
-                   transform_op,
-                   *first2};
+            internal::InclusiveScan<FwdIt1, FwdIt2, BinOp, UnOp, internal::iterator_value_t<FwdIt2>> op{
+                static_cast<size_t>(count - 1),
+                chunks,
+                std::next(first1),
+                std::next(first2),
+                reduce_op,
+                transform_op,
+                *first2};
             op.dispatch_apply_first(chunks);
             op.accumulate();
             op.dispatch_apply_second(chunks);
@@ -2446,8 +2511,7 @@ FwdIt2 transform_inclusive_scan(FwdIt1 first1,
 template <class FwdIt1, class FwdIt2, class BinOp, class T>
 FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, BinOp reduce_op, T val) noexcept
 {
-    return ::pstld::transform_inclusive_scan(
-        first1, last1, first2, reduce_op, internal::no_op{}, std::move(val));
+    return ::pstld::transform_inclusive_scan(first1, last1, first2, reduce_op, internal::no_op{}, std::move(val));
 }
 
 template <class FwdIt1, class FwdIt2, class BinOp>
@@ -2474,8 +2538,8 @@ struct ExclusiveScan : Dispatchable2<ExclusiveScan<It1, It2, BinOp, UnOp, T>> {
     T &m_init;
 
     ExclusiveScan(size_t count, size_t chunks, It1 first1, It2 first2, BinOp op, UnOp tr, T &init)
-        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks),
-          m_reduced(chunks), m_op(op), m_tr(tr), m_init(init)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks), m_reduced(chunks), m_op(op),
+          m_tr(tr), m_init(init)
     {
     }
 
@@ -2531,12 +2595,8 @@ FwdIt2 transform_exclusive_scan_serial(FwdIt1 first1,
 } // namespace internal
 
 template <class FwdIt1, class FwdIt2, class T, class BinOp, class UnOp>
-FwdIt2 transform_exclusive_scan(FwdIt1 first1,
-                                FwdIt1 last1,
-                                FwdIt2 first2,
-                                T val,
-                                BinOp reduce_op,
-                                UnOp transform_op) noexcept
+FwdIt2
+transform_exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinOp reduce_op, UnOp transform_op) noexcept
 {
     const auto count = std::distance(first1, last1);
     if( count == 0 )
@@ -2557,15 +2617,13 @@ FwdIt2 transform_exclusive_scan(FwdIt1 first1,
         } catch( const internal::parallelism_exception & ) {
         }
     }
-    return internal::transform_exclusive_scan_serial(
-        first1, last1, first2, std::move(val), reduce_op, transform_op);
+    return internal::transform_exclusive_scan_serial(first1, last1, first2, std::move(val), reduce_op, transform_op);
 }
 
 template <class FwdIt1, class FwdIt2, class T, class BinOp>
 FwdIt2 exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val, BinOp reduce_op) noexcept
 {
-    return ::pstld::transform_exclusive_scan(
-        first1, last1, first2, std::move(val), reduce_op, internal::no_op{});
+    return ::pstld::transform_exclusive_scan(first1, last1, first2, std::move(val), reduce_op, internal::no_op{});
 }
 
 template <class FwdIt1, class FwdIt2, class T>
@@ -2609,11 +2667,7 @@ struct LexicographicalCompare : Dispatchable<LexicographicalCompare<It1, It2, Cm
 } // namespace internal
 
 template <class FwdIt1, class FwdIt2, class Cmp>
-bool lexicographical_compare(FwdIt1 first1,
-                             FwdIt1 last1,
-                             FwdIt2 first2,
-                             FwdIt2 last2,
-                             Cmp cmp) noexcept
+bool lexicographical_compare(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, Cmp cmp) noexcept
 {
     const auto count1 = std::distance(first1, last1);
     const auto count2 = std::distance(first2, last2);
@@ -2625,8 +2679,7 @@ bool lexicographical_compare(FwdIt1 first1,
                 static_cast<size_t>(count_min), chunks, first1, first2, cmp};
             op.dispatch_apply(chunks);
             if( static_cast<FwdIt1>(op.m_result1.min) != op.m_partition1.end() )
-                return cmp(*static_cast<FwdIt1>(op.m_result1.min),
-                           *static_cast<FwdIt2>(op.m_result2.min));
+                return cmp(*static_cast<FwdIt1>(op.m_result1.min), *static_cast<FwdIt2>(op.m_result2.min));
             else
                 return count1 < count2;
         } catch( const internal::parallelism_exception & ) {
@@ -2655,15 +2708,15 @@ bool lexicographical_compare(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 
 
 #if defined(PSTLD_INTERNAL_HEADER_ONLY) || defined(PSTLD_INTERNAL_IMPLEMENTATION_FILE)
 
-    #include <sys/types.h>
-    #include <sys/sysctl.h>
-    #include <dispatch/dispatch.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <dispatch/dispatch.h>
 
 namespace pstld {
 
-    #if defined(PSTLD_INTERNAL_ARC)
+#if defined(PSTLD_INTERNAL_ARC)
 inline namespace arc {
-    #endif
+#endif
 
 namespace internal {
 
@@ -2678,13 +2731,12 @@ PSTLD_INTERNAL_IMPL size_t max_hw_threads() noexcept
     return threads;
 }
 
-PSTLD_INTERNAL_IMPL void
-dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept
+PSTLD_INTERNAL_IMPL void dispatch_apply(size_t iterations, void *ctx, void (*function)(void *, size_t)) noexcept
 {
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wnullability-extension"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-extension"
     ::dispatch_apply_f(iterations, DISPATCH_APPLY_AUTO, ctx, function);
-    #pragma clang diagnostic pop
+#pragma clang diagnostic pop
 }
 
 PSTLD_INTERNAL_IMPL void dispatch_async(void *ctx, void (*function)(void *)) noexcept
@@ -2699,17 +2751,15 @@ PSTLD_INTERNAL_IMPL DispatchGroup::DispatchGroup() noexcept
 
 PSTLD_INTERNAL_IMPL DispatchGroup::~DispatchGroup()
 {
-    #if !defined(PSTLD_INTERNAL_ARC)
+#if !defined(PSTLD_INTERNAL_ARC)
     ::dispatch_release(static_cast<dispatch_group_t>(m_group));
-    #endif
+#endif
 }
 
 PSTLD_INTERNAL_IMPL void DispatchGroup::dispatch(void *ctx, void (*function)(void *)) noexcept
 {
-    ::dispatch_group_async_f(static_cast<dispatch_group_t>(m_group),
-                             static_cast<dispatch_queue_t>(m_queue),
-                             ctx,
-                             function);
+    ::dispatch_group_async_f(
+        static_cast<dispatch_group_t>(m_group), static_cast<dispatch_queue_t>(m_queue), ctx, function);
 }
 
 PSTLD_INTERNAL_IMPL void DispatchGroup::wait() noexcept
@@ -2729,9 +2779,9 @@ PSTLD_INTERNAL_IMPL void parallelism_exception::raise()
 
 } // namespace internal
 
-    #if defined(PSTLD_INTERNAL_ARC)
+#if defined(PSTLD_INTERNAL_ARC)
 } // inline namespace arc
-    #endif
+#endif
 
 } // namespace pstld
 
@@ -2806,8 +2856,7 @@ inline constexpr bool __pstld_enabled = std::remove_reference_t<ExPo>::__pstld_e
 // 25.6.1 - all_of /////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class UnPred>
-execution::__enable_if_execution_policy<ExPo, bool>
-all_of(ExPo &&, It first, It last, UnPred p) noexcept
+execution::__enable_if_execution_policy<ExPo, bool> all_of(ExPo &&, It first, It last, UnPred p) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::all_of(first, last, p);
@@ -2818,8 +2867,7 @@ all_of(ExPo &&, It first, It last, UnPred p) noexcept
 // 25.6.2 - any_of ////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class UnPred>
-execution::__enable_if_execution_policy<ExPo, bool>
-any_of(ExPo &&, It first, It last, UnPred p) noexcept
+execution::__enable_if_execution_policy<ExPo, bool> any_of(ExPo &&, It first, It last, UnPred p) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::any_of(first, last, p);
@@ -2830,8 +2878,7 @@ any_of(ExPo &&, It first, It last, UnPred p) noexcept
 // 25.6.3 - none_of ////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class UnPred>
-execution::__enable_if_execution_policy<ExPo, bool>
-none_of(ExPo &&, It first, It last, UnPred p) noexcept
+execution::__enable_if_execution_policy<ExPo, bool> none_of(ExPo &&, It first, It last, UnPred p) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::none_of(first, last, p);
@@ -2842,8 +2889,7 @@ none_of(ExPo &&, It first, It last, UnPred p) noexcept
 // 25.6.4 - for_each, for_each_n ///////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class Func>
-execution::__enable_if_execution_policy<ExPo, void>
-for_each(ExPo &&, It first, It last, Func f) noexcept
+execution::__enable_if_execution_policy<ExPo, void> for_each(ExPo &&, It first, It last, Func f) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         ::pstld::for_each(first, last, f);
@@ -2852,8 +2898,7 @@ for_each(ExPo &&, It first, It last, Func f) noexcept
 }
 
 template <class ExPo, class It, class Size, class Func>
-execution::__enable_if_execution_policy<ExPo, It>
-for_each_n(ExPo &&, It first, Size count, Func f) noexcept
+execution::__enable_if_execution_policy<ExPo, It> for_each_n(ExPo &&, It first, Size count, Func f) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::for_each_n(first, count, f);
@@ -2864,8 +2909,7 @@ for_each_n(ExPo &&, It first, Size count, Func f) noexcept
 // 25.6.5 - find, find_if, find_if_not /////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
-execution::__enable_if_execution_policy<ExPo, It>
-find(ExPo &&, It first, It last, const T &value) noexcept
+execution::__enable_if_execution_policy<ExPo, It> find(ExPo &&, It first, It last, const T &value) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find(first, last, value);
@@ -2874,8 +2918,7 @@ find(ExPo &&, It first, It last, const T &value) noexcept
 }
 
 template <class ExPo, class It, class Pred>
-execution::__enable_if_execution_policy<ExPo, It>
-find_if(ExPo &&, It first, It last, Pred pred) noexcept
+execution::__enable_if_execution_policy<ExPo, It> find_if(ExPo &&, It first, It last, Pred pred) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_if(first, last, pred);
@@ -2884,8 +2927,7 @@ find_if(ExPo &&, It first, It last, Pred pred) noexcept
 }
 
 template <class ExPo, class It, class Pred>
-execution::__enable_if_execution_policy<ExPo, It>
-find_if_not(ExPo &&, It first, It last, Pred pred) noexcept
+execution::__enable_if_execution_policy<ExPo, It> find_if_not(ExPo &&, It first, It last, Pred pred) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_if_not(first, last, pred);
@@ -2896,8 +2938,7 @@ find_if_not(ExPo &&, It first, It last, Pred pred) noexcept
 // 25.6.6 - find_end ///////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>
-execution::__enable_if_execution_policy<ExPo, It1>
-find_end(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2)
+execution::__enable_if_execution_policy<ExPo, It1> find_end(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::find_end(first1, last1, first2, last2);
@@ -2949,8 +2990,7 @@ execution::__enable_if_execution_policy<ExPo, It> adjacent_find(ExPo &&, It firs
 }
 
 template <class ExPo, class It, class Pred>
-execution::__enable_if_execution_policy<ExPo, It>
-adjacent_find(ExPo &&, It first, It last, Pred pred) noexcept
+execution::__enable_if_execution_policy<ExPo, It> adjacent_find(ExPo &&, It first, It last, Pred pred) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::adjacent_find(first, last, pred);
@@ -3025,8 +3065,7 @@ mismatch(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, Cmp cmp) noexcep
 // 25.6.11 - equal /////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>
-execution::__enable_if_execution_policy<ExPo, bool>
-equal(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
+execution::__enable_if_execution_policy<ExPo, bool> equal(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::equal(first1, last1, first2);
@@ -3035,8 +3074,7 @@ equal(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
 }
 
 template <class ExPo, class It1, class It2, class Eq>
-execution::__enable_if_execution_policy<ExPo, bool>
-equal(ExPo &&, It1 first1, It1 last1, It2 first2, Eq eq) noexcept
+execution::__enable_if_execution_policy<ExPo, bool> equal(ExPo &&, It1 first1, It1 last1, It2 first2, Eq eq) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::equal(first1, last1, first2, eq);
@@ -3109,8 +3147,7 @@ search_n(ExPo &&, It first, It last, Size count, const T &value, Pred pred) noex
 // 25.7.1 - copy, copy_n, copy_if //////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>
-execution::__enable_if_execution_policy<ExPo, It2>
-copy(ExPo &&, It1 first, It1 last, It2 result) noexcept
+execution::__enable_if_execution_policy<ExPo, It2> copy(ExPo &&, It1 first, It1 last, It2 result) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::copy(first, last, result);
@@ -3119,8 +3156,7 @@ copy(ExPo &&, It1 first, It1 last, It2 result) noexcept
 }
 
 template <class ExPo, class It1, class Size, class It2>
-execution::__enable_if_execution_policy<ExPo, It2>
-copy_n(ExPo &&, It1 first, Size count, It2 result) noexcept
+execution::__enable_if_execution_policy<ExPo, It2> copy_n(ExPo &&, It1 first, Size count, It2 result) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::copy_n(first, count, result);
@@ -3129,8 +3165,7 @@ copy_n(ExPo &&, It1 first, Size count, It2 result) noexcept
 }
 
 template <class ExPo, class It1, class It2, class Pred>
-execution::__enable_if_execution_policy<ExPo, It2>
-copy_if(ExPo &&, It1 first, It1 last, It2 result, Pred pred) noexcept
+execution::__enable_if_execution_policy<ExPo, It2> copy_if(ExPo &&, It1 first, It1 last, It2 result, Pred pred) noexcept
 {
     return ::std::copy_if(first, last, result, pred); // stub only
 }
@@ -3138,8 +3173,7 @@ copy_if(ExPo &&, It1 first, It1 last, It2 result, Pred pred) noexcept
 // 25.7.2 - move ///////////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>
-execution::__enable_if_execution_policy<ExPo, It2>
-move(ExPo &&, It1 first, It1 last, It2 result) noexcept
+execution::__enable_if_execution_policy<ExPo, It2> move(ExPo &&, It1 first, It1 last, It2 result) noexcept
 {
     return ::std::move(first, last, result); // stub only
 }
@@ -3147,8 +3181,7 @@ move(ExPo &&, It1 first, It1 last, It2 result) noexcept
 // 25.7.3 - swap_ranges ////////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2>
-execution::__enable_if_execution_policy<ExPo, It2>
-swap_ranges(ExPo &&, It1 first, It1 last, It2 result) noexcept
+execution::__enable_if_execution_policy<ExPo, It2> swap_ranges(ExPo &&, It1 first, It1 last, It2 result) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::swap_ranges(first, last, result);
@@ -3219,8 +3252,7 @@ replace_copy_if(ExPo &&, It1 first, It1 last, It2 result, Pred pred, const T &ne
 // 25.7.6 - fill, fill_n ///////////////////////////////////////////////////////////////////////////
 
 template <class ExPo, class It, class T>
-execution::__enable_if_execution_policy<ExPo, void>
-fill(ExPo &&, It first, It last, const T &value) noexcept
+execution::__enable_if_execution_policy<ExPo, void> fill(ExPo &&, It first, It last, const T &value) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         ::pstld::fill(first, last, value);
@@ -3229,8 +3261,7 @@ fill(ExPo &&, It first, It last, const T &value) noexcept
 }
 
 template <class ExPo, class It, class Size, class T>
-execution::__enable_if_execution_policy<ExPo, It>
-fill_n(ExPo &&, It first, Size count, const T &value) noexcept
+execution::__enable_if_execution_policy<ExPo, It> fill_n(ExPo &&, It first, Size count, const T &value) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::fill_n(first, count, value);
@@ -3331,13 +3362,34 @@ execution::__enable_if_execution_policy<ExPo, It> is_sorted_until(ExPo &&, It fi
 }
 
 template <class ExPo, class It, class Cmp>
-execution::__enable_if_execution_policy<ExPo, It>
-is_sorted_until(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, It> is_sorted_until(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::is_sorted_until(first, last, cmp);
     else
         return ::std::is_sorted_until(first, last, cmp);
+}
+
+// 25.8.6 - merge //////////////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2, class It3>
+execution::__enable_if_execution_policy<ExPo, It3>
+merge(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, It3 first3)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::merge(first1, last1, first2, last2, first3);
+    else
+        return ::std::merge(first1, last1, first2, last2, first3);
+}
+
+template <class ExPo, class It1, class It2, class It3, class Cmp>
+execution::__enable_if_execution_policy<ExPo, It3>
+merge(ExPo &&, It1 first1, It1 last1, It2 first2, It2 last2, It3 first3, Cmp cmp)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::merge(first1, last1, first2, last2, first3, cmp);
+    else
+        return ::std::merge(first1, last1, first2, last2, first3, cmp);
 }
 
 // 25.8.9 - min_element, max_element, minmax_element ///////////////////////////////////////////////
@@ -3379,8 +3431,7 @@ execution::__enable_if_execution_policy<ExPo, It> max_element(ExPo &&, It first,
 }
 
 template <class ExPo, class It>
-execution::__enable_if_execution_policy<ExPo, std::pair<It, It>>
-minmax_element(ExPo &&, It first, It last)
+execution::__enable_if_execution_policy<ExPo, std::pair<It, It>> minmax_element(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::minmax_element(first, last);
@@ -3389,8 +3440,7 @@ minmax_element(ExPo &&, It first, It last)
 }
 
 template <class ExPo, class It, class Cmp>
-execution::__enable_if_execution_policy<ExPo, std::pair<It, It>>
-minmax_element(ExPo &&, It first, It last, Cmp cmp)
+execution::__enable_if_execution_policy<ExPo, std::pair<It, It>> minmax_element(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::minmax_element(first, last, cmp);
@@ -3442,8 +3492,7 @@ execution::__enable_if_execution_policy<ExPo, T> reduce(ExPo &&, It first, It la
 }
 
 template <class ExPo, class It, class T, class BinOp>
-execution::__enable_if_execution_policy<ExPo, T>
-reduce(ExPo &&, It first, It last, T val, BinOp op) noexcept
+execution::__enable_if_execution_policy<ExPo, T> reduce(ExPo &&, It first, It last, T val, BinOp op) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::reduce(first, last, std::move(val), op);
@@ -3465,19 +3514,13 @@ transform_reduce(ExPo &&, It1 first1, It1 last1, It2 first2, T val) noexcept
 }
 
 template <class ExPo, class It1, class It2, class T, class BinRedOp, class BinTrOp>
-execution::__enable_if_execution_policy<ExPo, T> transform_reduce(ExPo &&,
-                                                                  It1 first1,
-                                                                  It1 last1,
-                                                                  It2 first2,
-                                                                  T val,
-                                                                  BinRedOp redop,
-                                                                  BinTrOp trop) noexcept
+execution::__enable_if_execution_policy<ExPo, T>
+transform_reduce(ExPo &&, It1 first1, It1 last1, It2 first2, T val, BinRedOp redop, BinTrOp trop) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::transform_reduce(first1, last1, first2, std::move(val), redop, trop);
     else
-        return ::pstld::internal::move_transform_reduce(
-            first1, last1, first2, std::move(val), redop, trop);
+        return ::pstld::internal::move_transform_reduce(first1, last1, first2, std::move(val), redop, trop);
 }
 
 template <class ExPo, class It, class T, class BinOp, class UnOp>
@@ -3535,8 +3578,7 @@ inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, BinOp bop) noexcept
 }
 
 template <class ExPo, class It1, class It2>
-execution::__enable_if_execution_policy<ExPo, It2>
-inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
+execution::__enable_if_execution_policy<ExPo, It2> inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::inclusive_scan(first1, last1, first2);
@@ -3547,31 +3589,20 @@ inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2) noexcept
 // 25.10.10 - transform_exclusive_scan /////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2, class T, class BinOp, class UnOp>
-execution::__enable_if_execution_policy<ExPo, It2> transform_exclusive_scan(ExPo &&,
-                                                                            It1 first1,
-                                                                            It1 last1,
-                                                                            It2 first2,
-                                                                            T val,
-                                                                            BinOp bop,
-                                                                            UnOp uop) noexcept
+execution::__enable_if_execution_policy<ExPo, It2>
+transform_exclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, T val, BinOp bop, UnOp uop) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::transform_exclusive_scan(first1, last1, first2, std::move(val), bop, uop);
     else
-        return ::pstld::internal::transform_exclusive_scan_serial(
-            first1, last1, first2, std::move(val), bop, uop);
+        return ::pstld::internal::transform_exclusive_scan_serial(first1, last1, first2, std::move(val), bop, uop);
 }
 
 // 25.10.11 - transform_inclusive_scan /////////////////////////////////////////////////////////////
 
 template <class ExPo, class It1, class It2, class BinOp, class UnOp, class T>
-execution::__enable_if_execution_policy<ExPo, It2> transform_inclusive_scan(ExPo &&,
-                                                                            It1 first1,
-                                                                            It1 last1,
-                                                                            It2 first2,
-                                                                            BinOp bop,
-                                                                            UnOp uop,
-                                                                            T val) noexcept
+execution::__enable_if_execution_policy<ExPo, It2>
+transform_inclusive_scan(ExPo &&, It1 first1, It1 last1, It2 first2, BinOp bop, UnOp uop, T val) noexcept
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
         return ::pstld::transform_inclusive_scan(first1, last1, first2, bop, uop, std::move(val));
