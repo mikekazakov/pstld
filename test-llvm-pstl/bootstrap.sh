@@ -10,3 +10,4 @@ cd llvm-project
 git sparse-checkout init --cone
 git sparse-checkout add pstl
 git checkout
+git apply ../utils.patch

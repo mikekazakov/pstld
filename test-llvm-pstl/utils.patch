@@ -1,0 +1,13 @@
+diff --git a/pstl/test/support/utils.h b/pstl/test/support/utils.h
+index d223204..b24a4a5 100644
+--- a/pstl/test/support/utils.h
++++ b/pstl/test/support/utils.h
+@@ -787,7 +787,7 @@ struct MakeIterator
+ 
+ // Useful constant variables
+ constexpr std::size_t GuardSize = 5;
+-constexpr std::ptrdiff_t sizeLimit = 1000;
++constexpr std::ptrdiff_t sizeLimit = 100000;
+ 
+ template <typename Iter, typename Void = void> // local iterator_traits for non-iterators
+ struct iterator_traits_
