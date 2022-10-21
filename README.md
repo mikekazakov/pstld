@@ -3,7 +3,64 @@
 # pstld
 Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 
+The purpose of this library is to provide a drop-in implementation of C++ parallel algorithms for the Apple platforms.
+Xcode comes with no parallel algorithms in libc++, so this library aims to fill the gap.
+pstld uses the native scheduler (libdispatch) and does not depend on any 3rd-party libraries.
+
+## Usage
+
+The simplest way to use the library is to consume it as header-only and to request exposing the parallel algorithms in the namespace ```std```:
+```C++
+#include <cstdlib>
+#include <iostream>
+#define PSTLD_HEADER_ONLY   // no prebuilt library, only the header
+#define PSTLD_HACK_INTO_STD // export into namespace std
+#include "pstld.h"
+int main()
+{
+    std::vector<unsigned> v(100'000'000);
+    std::generate(v.begin(), v.end(), [] { return std::rand(); });
+    std::cout << std::reduce(std::execution::par, v.begin(), v.end()) << std::endl;
+}
+```
+The default Xcode toolchain can now build it:
+```Shell
+% clang++ -std=c++17 main.cpp -o test && ./test
+64818392
+```
+The same functions can be used directly from the ```pstld``` namespace without specifying the execution policy:
+```C++
+#include <cstdlib>
+#include <iostream>
+#define PSTLD_HEADER_ONLY   // no prebuilt library, only the header
+#include "pstld.h"
+int main()
+{
+    std::vector<unsigned> v(100'000'000);
+    std::generate(v.begin(), v.end(), [] { return std::rand(); });
+    std::cout << pstld::reduce(v.begin(), v.end()) << std::endl;
+}
+```
+pstld can be precompiled via CMake or manually by adding ```pstld.cpp``` into the build sources:
+```C++
+#include <cstdlib>
+#include <iostream>
+#include "pstld.h"
+int main()
+{
+    std::vector<unsigned> v(100'000'000);
+    std::generate(v.begin(), v.end(), [] { return std::rand(); });
+    std::cout << pstld::reduce(v.begin(), v.end()) << std::endl;
+}
+```
+```Shell
+% clang++ -std=c++17 main.cpp pstld.cpp -o test && ./test
+64818392
+```
+
 ## Completeness
+
+The library is not complete, this table shows which algorithms are currently available:
 
 § | Function | Exposed | Parallel
 :--- |:--- |:---:|:---:
@@ -93,11 +150,11 @@ Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 25.11.9 | std::destroy | ❌ | ❌
 | | std::destroy_n | ❌ | ❌
 
-## Parallel speed-up
+## Parallel speedup
 
-benchmark.cpp contains a set of primitive synthetic performance tests.
+```benchmark.cpp``` contains a set of primitive synthetic performance tests.
 Each row shows how the parallel implementation compares to its serial counterpart depending on the number of elements in a working set.
-The serial variant executes the default algorithms from LIBC++ and the parallel one runs the PSTLD implementation.
+The serial variant executes the default algorithms from libc++ and the parallel one runs the pstld implementation.
 Per-element operations are trivial in these benchmarks, so the speed-up numbers represent a somewhat worst-case scenario.
 The measurements were done on a M1 MacBook Pro (8 core CPU).
 
