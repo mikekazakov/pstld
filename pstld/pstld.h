@@ -539,6 +539,10 @@ struct alignas(hardware_destructive_interference_size) WorkCounter {
 //
 //--------------------------------------------------------------------------------------------------
 
+//--------------------------------------------------------------------------------------------------
+// reduce, transform_reduce
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class T, class BinOp, class UnOp>
@@ -706,6 +710,10 @@ T transform_reduce(It1 first1, It1 last1, It2 first2, T val) noexcept
         first1, last1, first2, std::move(val), std::plus<>{}, std::multiplies<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// all_of, none_of, any_of
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class UnPred, bool Expected, bool Init>
@@ -786,6 +794,10 @@ bool any_of(FwdIt first, FwdIt last, UnPred pred) noexcept
     return std::any_of(first, last, pred);
 }
 
+//--------------------------------------------------------------------------------------------------
+// for_each, for_each_n
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class Func>
@@ -838,6 +850,10 @@ FwdIt for_each_n(FwdIt first, Size count, Func func) noexcept
     return std::for_each_n(first, count, func);
 }
 
+//--------------------------------------------------------------------------------------------------
+// count, count_if
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class Pred>
@@ -884,6 +900,10 @@ count(FwdIt first, FwdIt last, const T &value) noexcept
     return ::pstld::count_if(
         first, last, [&value](const auto &iter_value) { return iter_value == value; });
 }
+
+//--------------------------------------------------------------------------------------------------
+// find, find_if, find_if_not, find_first_of
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -959,6 +979,10 @@ FwdIt1 find_first_of(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, P
     });
 }
 
+//--------------------------------------------------------------------------------------------------
+// adjacent_find
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class Pred>
@@ -1014,6 +1038,10 @@ FwdIt adjacent_find(FwdIt first, FwdIt last) noexcept
     return ::pstld::adjacent_find(
         first, last, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
+
+//--------------------------------------------------------------------------------------------------
+// search
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1083,6 +1111,10 @@ FwdIt1 search(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
     return ::pstld::search(
         first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
+
+//--------------------------------------------------------------------------------------------------
+// search_n
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1157,6 +1189,10 @@ FwdIt search_n(FwdIt first, FwdIt last, Size count2, const T &value) noexcept
 {
     return ::pstld::search_n(first, last, count2, value, std::equal_to<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// find_end
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1251,6 +1287,10 @@ FwdIt1 find_end(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexce
         first1, last1, first2, last2, [](const auto &v1, const auto &v2) { return v1 == v2; });
 }
 
+//--------------------------------------------------------------------------------------------------
+// is_sorted
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class Cmp>
@@ -1308,6 +1348,10 @@ bool is_sorted(FwdIt first, FwdIt last)
     return ::pstld::is_sorted(first, last, std::less<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// is_sorted_until
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class Cmp>
@@ -1362,6 +1406,10 @@ FwdIt is_sorted_until(FwdIt first, FwdIt last)
 {
     return ::pstld::is_sorted_until(first, last, std::less<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// min_element
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1420,6 +1468,10 @@ FwdIt min_element(FwdIt first, FwdIt last)
     return ::pstld::min_element(first, last, std::less<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// max_element
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class Cmp>
@@ -1476,6 +1528,10 @@ FwdIt max_element(FwdIt first, FwdIt last)
 {
     return ::pstld::max_element(first, last, std::less<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// minmax_element
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1535,6 +1591,10 @@ std::pair<FwdIt, FwdIt> minmax_element(FwdIt first, FwdIt last)
 {
     return ::pstld::minmax_element(first, last, std::less<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// transform
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1613,6 +1673,10 @@ transform(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt3 first3, BinOp trans
     return std::transform(first1, last1, first2, first3, transform_op);
 }
 
+//--------------------------------------------------------------------------------------------------
+// equal
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It1, class It2, class Cmp>
@@ -1690,6 +1754,10 @@ bool equal(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
     return ::pstld::equal(first1, last1, first2, last2, std::equal_to<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// mismatch
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -1771,6 +1839,10 @@ mismatch(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2) noexcept
 {
     return ::pstld::mismatch(first1, last1, first2, last2, std::equal_to<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// sort
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -2065,6 +2137,10 @@ void sort(RanIt first, RanIt last) noexcept
     return ::pstld::sort(first, last, std::less<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// merge
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It1, class It2, class It3, class Cmp>
@@ -2244,6 +2320,10 @@ FwdIt3 merge(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 last2, FwdIt3 fi
     return ::pstld::merge(first1, last1, first2, last2, first3, std::less<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// fill, fill_n
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It, class T>
@@ -2298,6 +2378,10 @@ FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
     return std::fill_n(first, count, val);
 }
 
+//--------------------------------------------------------------------------------------------------
+// copy, copy_n
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It1, class It2>
@@ -2351,6 +2435,10 @@ FwdIt2 copy_n(FwdIt1 first1, Size count, FwdIt2 first2) noexcept
     return std::copy_n(first1, count, first2);
 }
 
+//--------------------------------------------------------------------------------------------------
+// replace, replace_if
+//--------------------------------------------------------------------------------------------------
+
 template <class FwdIt, class T>
 void replace(FwdIt first, FwdIt last, const T &old_val, const T &new_val) noexcept
 {
@@ -2368,6 +2456,10 @@ void replace_if(FwdIt first, FwdIt last, Pred pred, const T &new_val) noexcept
             val = new_val;
     });
 }
+
+//--------------------------------------------------------------------------------------------------
+// swap_ranges
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -2407,6 +2499,10 @@ FwdIt2 swap_ranges(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     }
     return std::swap_ranges(first1, last1, first2);
 }
+
+//--------------------------------------------------------------------------------------------------
+// adjacent_difference
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -2464,6 +2560,10 @@ FwdIt2 adjacent_difference(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     return ::pstld::adjacent_difference(first1, last1, first2, std::minus<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// reverse
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It>
@@ -2502,6 +2602,10 @@ void reverse(FwdIt first, FwdIt last) noexcept
     }
     ::std::reverse(first, last);
 }
+
+//--------------------------------------------------------------------------------------------------
+// inclusive_scan, transform_inclusive_scan
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
@@ -2641,6 +2745,10 @@ FwdIt2 inclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
     return ::pstld::inclusive_scan(first1, last1, first2, ::std::plus<>{});
 }
 
+//--------------------------------------------------------------------------------------------------
+// exclusive_scan, transform_exclusive_scan
+//--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It1, class It2, class BinOp, class UnOp, class T>
@@ -2752,6 +2860,10 @@ FwdIt2 exclusive_scan(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, T val) noexcep
 {
     return ::pstld::exclusive_scan(first1, last1, first2, std::move(val), ::std::plus<>{});
 }
+
+//--------------------------------------------------------------------------------------------------
+// lexicographical_compare
+//--------------------------------------------------------------------------------------------------
 
 namespace internal {
 
