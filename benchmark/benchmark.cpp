@@ -12,8 +12,8 @@
 
 static constexpr size_t g_Iterations = 10;
 static constexpr size_t g_IterationsDiscard = 1;
-static const std::array<size_t, 7> g_Sizes =
-    {100, 1000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
+static const std::array<size_t, 6> g_Sizes =
+    {1000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
 
 template <class Tp>
 inline void noopt(Tp const &value)
@@ -363,6 +363,19 @@ struct is_sorted { // 25.8.2.5
 };
 
 template <class ExPo>
+struct is_partitioned { // 25.8.5
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure([&] { v = std::vector<double>(size, 42.); },
+                       [&] {
+                           noopt(std::is_partitioned(
+                               ExPo{}, v.begin(), v.end(), [](double v) { return v < 50.; }));
+                       });
+    }
+};
+
+template <class ExPo>
 struct merge { // 25.8.6
     auto operator()(size_t size)
     {
@@ -371,11 +384,13 @@ struct merge { // 25.8.6
             [&] {
                 v1 = std::vector<double>(size);
                 v2 = std::vector<double>(size);
-                v3 = std::vector<double>(size+size);
+                v3 = std::vector<double>(size + size);
                 std::iota(v1.begin(), v1.end(), 0.);
                 std::iota(v2.begin(), v2.end(), 0.);
             },
-            [&] { noopt(std::merge(ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end(), v3.begin())); });
+            [&] {
+                noopt(std::merge(ExPo{}, v1.begin(), v1.end(), v2.begin(), v2.end(), v3.begin()));
+            });
     }
 };
 
@@ -583,6 +598,7 @@ int main()
     results.emplace_back(record<benchmarks::sort_Asc>());
     results.emplace_back(record<benchmarks::sort_Des>());
     results.emplace_back(record<benchmarks::is_sorted>());
+    results.emplace_back(record<benchmarks::is_partitioned>());
     results.emplace_back(record<benchmarks::merge>());
     results.emplace_back(record<benchmarks::minmax_element>());
     results.emplace_back(record<benchmarks::lexicographical_compare>());

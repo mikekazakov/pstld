@@ -1408,6 +1408,118 @@ FwdIt is_sorted_until(FwdIt first, FwdIt last)
 }
 
 //--------------------------------------------------------------------------------------------------
+// is_partitioned
+//--------------------------------------------------------------------------------------------------
+
+namespace internal {
+
+template <class It, class Pred>
+struct IsPartitioned : Dispatchable<IsPartitioned<It, Pred>> {
+    enum Scan
+    {
+        broken,
+        all_true,
+        all_false,
+        true_false
+    };
+
+    Partition<It> m_partition;
+    Pred m_pred;
+    std::atomic<size_t> m_right_true{0};
+    std::atomic<size_t> m_left_false{std::numeric_limits<size_t>::max() - 1};
+
+    IsPartitioned(size_t count, size_t chunks, It first, Pred pred)
+        : m_partition(first, count, chunks), m_pred(pred)
+    {
+    }
+
+    Scan scan(It first, It last) noexcept
+    {
+        if( m_pred(*first) ) {
+            while( true ) {
+                ++first;
+                if( first == last )
+                    return all_true;
+                if( !m_pred(*first) )
+                    break;
+            }
+            while( true ) {
+                ++first;
+                if( first == last )
+                    return true_false;
+                if( m_pred(*first) )
+                    return broken;
+            }
+        }
+        else {
+            while( true ) {
+                ++first;
+                if( first == last )
+                    return all_false;
+                if( m_pred(*first) )
+                    return broken;
+            }
+        }
+    }
+
+    void run(size_t ind) noexcept
+    {
+        if( m_right_true.load() <= m_left_false.load() ) {
+            auto p = m_partition.at(ind);
+            auto s = scan(p.first, p.last);
+            if( s == all_true ) {
+                size_t was = m_right_true.load();
+                while( was < ind ) {
+                    if( m_right_true.compare_exchange_strong(was, ind) )
+                        break;
+                }
+            }
+            else if( s == all_false ) {
+                size_t was = m_left_false.load();
+                while( was > ind ) {
+                    if( m_left_false.compare_exchange_strong(was, ind) )
+                        break;
+                }
+            }
+            else if( s == true_false ) {
+                size_t was = m_right_true.load();
+                while( was < ind ) {
+                    if( m_right_true.compare_exchange_strong(was, ind) )
+                        break;
+                }
+                was = m_left_false.load();
+                while( was > ind ) {
+                    if( m_left_false.compare_exchange_strong(was, ind) )
+                        break;
+                }
+            }
+            else {
+                m_right_true.store(std::numeric_limits<size_t>::max());
+            }
+        }
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Pred>
+bool is_partitioned(FwdIt first, FwdIt last, Pred pred)
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::IsPartitioned<FwdIt, Pred> op{
+                static_cast<size_t>(count), chunks, first, pred};
+            op.dispatch_apply(chunks);
+            return op.m_right_true.load() <= op.m_left_false.load();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::is_partitioned(first, last, pred);
+}
+
+//--------------------------------------------------------------------------------------------------
 // min_element
 //--------------------------------------------------------------------------------------------------
 
@@ -3629,6 +3741,18 @@ is_sorted_until(ExPo &&, It first, It last, Cmp cmp)
         return ::pstld::is_sorted_until(first, last, cmp);
     else
         return ::std::is_sorted_until(first, last, cmp);
+}
+
+// 25.8.5 - is_partitioned /////////////////////////////////////////////////////////////////////////
+
+template <class ExPo, class It, class Pred>
+execution::__enable_if_execution_policy<ExPo, bool>
+is_partitioned(ExPo &&, It first, It last, Pred pred)
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::is_partitioned(first, last, pred);
+    else
+        return ::std::is_partitioned(first, last, pred);
 }
 
 // 25.8.6 - merge //////////////////////////////////////////////////////////////////////////////////
