@@ -12,8 +12,7 @@
 
 static constexpr size_t g_Iterations = 10;
 static constexpr size_t g_IterationsDiscard = 1;
-static const std::array<size_t, 6> g_Sizes =
-    {1000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
+static constexpr size_t g_Sizes[] = {1000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
 
 template <class Tp>
 inline void noopt(Tp const &value)
@@ -27,8 +26,8 @@ inline void noopt(Tp &value)
     asm volatile("" : "+r,m"(value) : : "memory");
 }
 
-template <class Setup, class Work>
-std::chrono::steady_clock::duration measure(Setup setup, Work work)
+template <class Setup, class Work, class Cleanup>
+std::chrono::steady_clock::duration measure(Setup setup, Work work, Cleanup cleanup)
 {
     std::array<std::chrono::steady_clock::duration, g_Iterations> runs;
     for( size_t i = 0; i != g_Iterations; ++i ) {
@@ -36,12 +35,19 @@ std::chrono::steady_clock::duration measure(Setup setup, Work work)
         const auto start = std::chrono::steady_clock::now();
         work();
         const auto end = std::chrono::steady_clock::now();
+        cleanup();
         runs[i] = end - start;
     }
     std::sort(runs.begin(), runs.end());
     return std::accumulate(runs.begin() + g_IterationsDiscard,
                            runs.end() - g_IterationsDiscard,
                            std::chrono::steady_clock::duration{});
+}
+
+template <class Setup, class Work>
+std::chrono::steady_clock::duration measure(Setup setup, Work work)
+{
+    return measure(setup, work, [] {});
 }
 
 namespace benchmarks {
@@ -537,6 +543,44 @@ struct adjacent_difference { // 25.10.12
     }
 };
 
+template <class ExPo>
+struct uninitialized_fill { // 25.11.7
+    auto operator()(size_t size)
+    {
+        std::unique_ptr<char[]> mem;
+        return measure([&] { mem = std::make_unique<char[]>(sizeof(std::string) * size); },
+                       [&] {
+                           std::uninitialized_fill(ExPo{},
+                                                   (std::string *)mem.get(),
+                                                   (std::string *)mem.get() + size,
+                                                   "Hello from a definitely non-SBO string!");
+                           noopt(mem);
+                       },
+                       [&] {
+                           std::destroy((std::string *)mem.get(), (std::string *)mem.get() + size);
+                           noopt(mem);
+                       });
+    }
+};
+
+template <class ExPo>
+struct destroy { // 25.11.9
+    auto operator()(size_t size)
+    {
+        std::unique_ptr<char[]> mem;
+        return measure(
+            [&] {
+                mem = std::make_unique<char[]>(sizeof(std::string) * size);
+                std::uninitialized_fill_n(
+                    (std::string *)mem.get(), size, "Hello from a definitely non-SBO string!");
+            },
+            [&] {
+                std::destroy(ExPo{}, (std::string *)mem.get(), (std::string *)mem.get() + size);
+                noopt(mem);
+            });
+    }
+};
+
 template <class T>
 static std::string demangle()
 {
@@ -554,7 +598,7 @@ static std::string demangle()
 
 struct Result {
     std::string name;
-    std::array<double, g_Sizes.size()> speedups;
+    std::array<double, std::size(g_Sizes)> speedups;
 };
 
 template <template <class> class Benchmark>
@@ -567,7 +611,7 @@ Result record()
     using Par = Benchmark<std::execution::parallel_policy>;
     Result r;
     r.name = benchmarks::demangle<Seq>();
-    for( size_t i = 0; i != g_Sizes.size(); ++i )
+    for( size_t i = 0; i != std::size(g_Sizes); ++i )
         r.speedups[i] = micro(Seq{}(g_Sizes[i])) / micro(Par{}(g_Sizes[i]));
     return r;
 }
@@ -609,6 +653,8 @@ int main()
     results.emplace_back(record<benchmarks::transform_exclusive_scan>());
     results.emplace_back(record<benchmarks::transform_inclusive_scan>());
     results.emplace_back(record<benchmarks::adjacent_difference>());
+    results.emplace_back(record<benchmarks::uninitialized_fill>());
+    results.emplace_back(record<benchmarks::destroy>());
 
     const auto max_name_len =
         std::max_element(results.begin(), results.end(), [](auto &a, auto &b) {

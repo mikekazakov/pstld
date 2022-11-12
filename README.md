@@ -145,18 +145,18 @@ The library is not complete, this table shows which algorithms are currently ava
 | | std::uninitialized_copy_n | ❌ | ❌
 25.11.6 | std::uninitialized_move | ❌ | ❌
 | | std::uninitialized_move_n | ❌ | ❌
-25.11.7 | std::uninitialized_fill | ❌ | ❌
-| | std::uninitialized_fill_n | ❌ | ❌
-25.11.9 | std::destroy | ❌ | ❌
-| | std::destroy_n | ❌ | ❌
+25.11.7 | std::uninitialized_fill | ✅ | ✅
+| | std::uninitialized_fill_n | ✅ | ✅
+25.11.9 | std::destroy | ✅ | ✅
+| | std::destroy_n | ✅ | ✅
 
 ## Parallel speedup
 
 ```benchmark.cpp``` contains a set of primitive synthetic performance tests.
 Each row shows how the parallel implementation compares to its serial counterpart depending on the number of elements in a working set.
 The serial variant executes the default algorithms from libc++ and the parallel one runs the pstld implementation.
-Per-element operations are trivial in these benchmarks, so the speed-up numbers represent a somewhat worst-case scenario.
-The measurements were done on a M1 MacBook Pro (8 core CPU).
+Per-element operations are mostly trivial in these benchmarks, so the speed-up numbers represent a somewhat worst-case scenario.
+The measurements were done on a M1 MacBook Pro (4P/4E cores CPU).
 
 ```
                                1000      10000     100000    1000000   10000000  100000000 
@@ -194,4 +194,6 @@ inclusive_scan                 0.52       0.62       0.93       2.26       2.24 
 transform_exclusive_scan       0.44       0.44       1.68       2.24       2.27       2.23 
 transform_inclusive_scan       0.39       0.57       1.77       2.27       2.29       2.32 
 adjacent_difference            0.21       0.75       0.49       0.91       0.79       0.78
+uninitialized_fill             0.63       1.52       3.37       4.02       4.07       3.50
+destroy                        0.25       0.64       1.51       1.61       1.67       1.92
 ```

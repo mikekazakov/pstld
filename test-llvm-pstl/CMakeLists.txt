@@ -43,6 +43,7 @@ set(UNIT_TESTS
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/scan.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/transform_reduce.pass.cpp
     ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/numerics/numeric.ops/transform_scan.pass.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/llvm-project/pstl/test/std/utilities/memory/specialized.algorithms/uninitialized_fill_destroy.pass.cpp
 )
 
 foreach(_file IN LISTS UNIT_TESTS)
@@ -57,7 +58,7 @@ foreach(_file IN LISTS UNIT_TESTS)
     target_link_libraries(${_target} PRIVATE pstld)
     set_target_properties(${_target} PROPERTIES
         FOLDER "Tests/LLVM"
-        COMPILE_FLAGS "-includepstld/pstld.h -includetest-llvm-pstl/helpers.h -Wall -Wextra -Wpedantic -Werror"
+        COMPILE_FLAGS "-includepstld/pstld.h -includetest-llvm-pstl/helpers.h -Wall -Wextra -Wpedantic -Werror -Wno-shorten-64-to-32 -Wno-deprecated-copy"
         CXX_STANDARD 17
         CXX_EXTENSIONS NO
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
