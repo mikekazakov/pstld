@@ -3144,6 +3144,101 @@ FwdIt uninitialized_value_construct_n(FwdIt first, Size count) noexcept
 }
 
 //--------------------------------------------------------------------------------------------------
+// uninitialized_copy, uninitialized_move
+//--------------------------------------------------------------------------------------------------
+
+namespace internal {
+
+template <class It1, class It2, bool Copy>
+struct UninitializedCopyMove : Dispatchable<UninitializedCopyMove<It1, It2, Copy>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+
+    UninitializedCopyMove(size_t count, size_t chunks, It1 first1, It2 first2)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        if constexpr( Copy )
+            std::uninitialized_copy(p1.first, p1.last, p2.first);
+        else
+            std::uninitialized_move(p1.first, p1.last, p2.first);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 uninitialized_copy(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedCopyMove<FwdIt1, FwdIt2, true> op{
+                static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_copy(first1, last1, first2);
+}
+
+template <class FwdIt1, class Size, class FwdIt2>
+FwdIt2 uninitialized_copy_n(FwdIt1 first1, Size count, FwdIt2 first2) noexcept
+{
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedCopyMove<FwdIt1, FwdIt2, true> op{
+                static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_copy_n(first1, count, first2);
+}
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 uninitialized_move(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedCopyMove<FwdIt1, FwdIt2, false> op{
+                static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_move(first1, last1, first2);
+}
+
+template <class FwdIt1, class Size, class FwdIt2>
+std::pair<FwdIt1, FwdIt2> uninitialized_move_n(FwdIt1 first1, Size count, FwdIt2 first2) noexcept
+{
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedCopyMove<FwdIt1, FwdIt2, false> op{
+                static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return {op.m_partition1.end(), op.m_partition2.end()};
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_move_n(first1, count, first2);
+}
+
+//--------------------------------------------------------------------------------------------------
 // uninitialized_fill
 //--------------------------------------------------------------------------------------------------
 
@@ -4305,6 +4400,50 @@ uninitialized_value_construct_n(ExPo &&, It first, Size count) noexcept
         return ::pstld::uninitialized_value_construct_n(first, count);
     else
         return ::std::uninitialized_value_construct_n(first, count);
+}
+
+// 25.11.5 - uninitialized_copy, uninitialized_copy_n //////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+uninitialized_copy(ExPo &&, It1 first, It1 last, It2 result) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::uninitialized_copy(first, last, result);
+    else
+        return ::std::uninitialized_copy(first, last, result);
+}
+
+template <class ExPo, class It1, class Size, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+uninitialized_copy_n(ExPo &&, It1 first, Size count, It2 result) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::uninitialized_copy_n(first, count, result);
+    else
+        return ::std::uninitialized_copy_n(first, count, result);
+}
+
+// 25.11.6 - uninitialized_move, uninitialized_move_n //////////////////////////////////////////////
+
+template <class ExPo, class It1, class It2>
+execution::__enable_if_execution_policy<ExPo, It2>
+uninitialized_move(ExPo &&, It1 first, It1 last, It2 result) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::uninitialized_move(first, last, result);
+    else
+        return ::std::uninitialized_move(first, last, result);
+}
+
+template <class ExPo, class It1, class Size, class It2>
+execution::__enable_if_execution_policy<ExPo, std::pair<It1, It2>>
+uninitialized_move_n(ExPo &&, It1 first, Size count, It2 result) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::uninitialized_move_n(first, count, result);
+    else
+        return ::std::uninitialized_move_n(first, count, result);
 }
 
 // 25.11.7 - uninitialized_fill, uninitialized_fill_n //////////////////////////////////////////////

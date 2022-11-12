@@ -562,6 +562,47 @@ struct uninitialized_value_construct { // 25.11.4
 };
 
 template <class ExPo>
+struct uninitialized_copy { // 25.11.5
+    auto operator()(size_t size)
+    {
+        std::vector<std::string> src = std::vector<std::string>(size, "Small string");
+        std::unique_ptr<char[]> mem;
+        return measure([&] { mem = std::make_unique<char[]>(sizeof(std::string) * size); },
+                       [&] {
+                           std::uninitialized_copy(
+                               ExPo{}, src.begin(), src.end(), (std::string *)mem.get());
+                           noopt(mem);
+                       },
+                       [&] {
+                           std::destroy((std::string *)mem.get(), (std::string *)mem.get() + size);
+                           noopt(mem);
+                       });
+    }
+};
+
+template <class ExPo>
+struct uninitialized_move { // 25.11.6
+    auto operator()(size_t size)
+    {
+        std::vector<std::string> src;
+        std::unique_ptr<char[]> mem;
+        return measure(
+            [&] {
+                src = std::vector<std::string>(size, "Small string");
+                mem = std::make_unique<char[]>(sizeof(std::string) * size);
+            },
+            [&] {
+                std::uninitialized_move(ExPo{}, src.begin(), src.end(), (std::string *)mem.get());
+                noopt(mem);
+            },
+            [&] {
+                std::destroy((std::string *)mem.get(), (std::string *)mem.get() + size);
+                noopt(mem);
+            });
+    }
+};
+
+template <class ExPo>
 struct uninitialized_fill { // 25.11.7
     auto operator()(size_t size)
     {
@@ -672,6 +713,8 @@ int main()
     results.emplace_back(record<benchmarks::transform_inclusive_scan>());
     results.emplace_back(record<benchmarks::adjacent_difference>());
     results.emplace_back(record<benchmarks::uninitialized_value_construct>());
+    results.emplace_back(record<benchmarks::uninitialized_copy>());
+    results.emplace_back(record<benchmarks::uninitialized_move>());
     results.emplace_back(record<benchmarks::uninitialized_fill>());
     results.emplace_back(record<benchmarks::destroy>());
 

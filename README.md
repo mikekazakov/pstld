@@ -141,10 +141,10 @@ The library is not complete, this table shows which algorithms are currently ava
 | | std::uninitialized_default_construct_n | ✅ | ✅
 25.11.4 | std::uninitialized_value_construct | ✅ | ✅
 | | std::uninitialized_value_construct_n | ✅ | ✅
-25.11.5 | std::uninitialized_copy | ❌ | ❌
-| | std::uninitialized_copy_n | ❌ | ❌
-25.11.6 | std::uninitialized_move | ❌ | ❌
-| | std::uninitialized_move_n | ❌ | ❌
+25.11.5 | std::uninitialized_copy | ✅ | ✅
+| | std::uninitialized_copy_n | ✅ | ✅
+25.11.6 | std::uninitialized_move | ✅ | ✅
+| | std::uninitialized_move_n | ✅ | ✅
 25.11.7 | std::uninitialized_fill | ✅ | ✅
 | | std::uninitialized_fill_n | ✅ | ✅
 25.11.9 | std::destroy | ✅ | ✅
@@ -156,7 +156,7 @@ The library is not complete, this table shows which algorithms are currently ava
 Each row shows how the parallel implementation compares to its serial counterpart depending on the number of elements in a working set.
 The serial variant executes the default algorithms from libc++ and the parallel one runs the pstld implementation.
 Per-element operations are mostly trivial in these benchmarks, so the speed-up numbers represent a somewhat worst-case scenario.
-The measurements were done on a M1 MacBook Pro (4P/4E cores CPU).
+The measurements were done on a M1 MacBook Pro (4P+4E cores CPU).
 
 ```
                                1000      10000     100000    1000000   10000000  100000000 
@@ -195,11 +195,13 @@ transform_exclusive_scan       0.44       0.44       1.68       2.24       2.27 
 transform_inclusive_scan       0.39       0.57       1.77       2.27       2.29       2.32 
 adjacent_difference            0.21       0.75       0.49       0.91       0.79       0.78
 uninitialized_value_construct  0.44       0.27       0.92       0.98       1.70       2.27
+uninitialized_copy             0.51       0.99       3.39       1.69       2.25       2.10
+uninitialized_move             0.54       0.47       1.16       1.22       1.65       1.79
 uninitialized_fill             0.63       1.52       3.37       4.02       4.07       3.50
 destroy                        0.25       0.64       1.51       1.61       1.67       1.92
 ```
 
-## Running benchmarks
+## Running the benchmarks
 
 Run the following commands to execute the benchmarks locally:
 
