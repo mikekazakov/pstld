@@ -544,6 +544,24 @@ struct adjacent_difference { // 25.10.12
 };
 
 template <class ExPo>
+struct uninitialized_value_construct { // 25.11.4
+    auto operator()(size_t size)
+    {
+        std::unique_ptr<char[]> mem;
+        return measure([&] { mem = std::make_unique<char[]>(sizeof(std::string) * size); },
+                       [&] {
+                           std::uninitialized_value_construct(
+                               ExPo{}, (std::string *)mem.get(), (std::string *)mem.get() + size);
+                           noopt(mem);
+                       },
+                       [&] {
+                           std::destroy((std::string *)mem.get(), (std::string *)mem.get() + size);
+                           noopt(mem);
+                       });
+    }
+};
+
+template <class ExPo>
 struct uninitialized_fill { // 25.11.7
     auto operator()(size_t size)
     {
@@ -653,6 +671,7 @@ int main()
     results.emplace_back(record<benchmarks::transform_exclusive_scan>());
     results.emplace_back(record<benchmarks::transform_inclusive_scan>());
     results.emplace_back(record<benchmarks::adjacent_difference>());
+    results.emplace_back(record<benchmarks::uninitialized_value_construct>());
     results.emplace_back(record<benchmarks::uninitialized_fill>());
     results.emplace_back(record<benchmarks::destroy>());
 

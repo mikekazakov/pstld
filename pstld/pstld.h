@@ -3045,6 +3045,105 @@ bool lexicographical_compare(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2, FwdIt2 
 }
 
 //--------------------------------------------------------------------------------------------------
+// uninitialized_construct
+//--------------------------------------------------------------------------------------------------
+
+namespace internal {
+
+template <class It, bool Value>
+struct UninitializedConstruct : Dispatchable<UninitializedConstruct<It, Value>> {
+    Partition<It> m_partition;
+
+    UninitializedConstruct(size_t count, size_t chunks, It first)
+        : m_partition(first, count, chunks)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+        if constexpr( Value )
+            std::uninitialized_value_construct(p.first, p.last);
+        else
+            std::uninitialized_default_construct(p.first, p.last);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt>
+void uninitialized_default_construct(FwdIt first, FwdIt last) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedConstruct<FwdIt, false> op{
+                static_cast<size_t>(count), chunks, first};
+            op.dispatch_apply(chunks);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_default_construct(first, last);
+}
+
+template <class FwdIt, class Size>
+FwdIt uninitialized_default_construct_n(FwdIt first, Size count) noexcept
+{
+    if( count < 1 )
+        return first;
+
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedConstruct<FwdIt, false> op{
+                static_cast<size_t>(count), chunks, first};
+            op.dispatch_apply(chunks);
+            return op.m_partition.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_default_construct_n(first, count);
+}
+
+template <class FwdIt>
+void uninitialized_value_construct(FwdIt first, FwdIt last) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedConstruct<FwdIt, true> op{
+                static_cast<size_t>(count), chunks, first};
+            op.dispatch_apply(chunks);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_value_construct(first, last);
+}
+
+template <class FwdIt, class Size>
+FwdIt uninitialized_value_construct_n(FwdIt first, Size count) noexcept
+{
+    if( count < 1 )
+        return first;
+
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::UninitializedConstruct<FwdIt, true> op{
+                static_cast<size_t>(count), chunks, first};
+            op.dispatch_apply(chunks);
+            return op.m_partition.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::uninitialized_value_construct_n(first, count);
+}
+
+//--------------------------------------------------------------------------------------------------
 // uninitialized_fill
 //--------------------------------------------------------------------------------------------------
 
@@ -3108,6 +3207,7 @@ FwdIt uninitialized_fill_n(FwdIt first, Size count, const T &val) noexcept
 //--------------------------------------------------------------------------------------------------
 // destroy
 //--------------------------------------------------------------------------------------------------
+
 namespace internal {
 
 template <class It>
@@ -4161,6 +4261,50 @@ adjacent_difference(ExPo &&, It1 first1, It1 last1, It2 first2, BinOp op) noexce
         return ::pstld::adjacent_difference(first1, last1, first2, op);
     else
         return ::std::adjacent_difference(first1, last1, first2, op);
+}
+
+// 25.11.3 - uninitialized_default_construct, uninitialized_default_construct_n ////////////////////
+
+template <class ExPo, class It>
+execution::__enable_if_execution_policy<ExPo, void>
+uninitialized_default_construct(ExPo &&, It first, It last) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::uninitialized_default_construct(first, last);
+    else
+        ::std::uninitialized_default_construct(first, last);
+}
+
+template <class ExPo, class It, class Size>
+execution::__enable_if_execution_policy<ExPo, It>
+uninitialized_default_construct_n(ExPo &&, It first, Size count) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::uninitialized_default_construct_n(first, count);
+    else
+        return ::std::uninitialized_default_construct_n(first, count);
+}
+
+// 25.11.4 - uninitialized_value_construct, uninitialized_value_construct_n ////////////////////////
+
+template <class ExPo, class It>
+execution::__enable_if_execution_policy<ExPo, void>
+uninitialized_value_construct(ExPo &&, It first, It last) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::uninitialized_value_construct(first, last);
+    else
+        ::std::uninitialized_value_construct(first, last);
+}
+
+template <class ExPo, class It, class Size>
+execution::__enable_if_execution_policy<ExPo, It>
+uninitialized_value_construct_n(ExPo &&, It first, Size count) noexcept
+{
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::uninitialized_value_construct_n(first, count);
+    else
+        return ::std::uninitialized_value_construct_n(first, count);
 }
 
 // 25.11.7 - uninitialized_fill, uninitialized_fill_n //////////////////////////////////////////////

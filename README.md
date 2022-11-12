@@ -137,10 +137,10 @@ The library is not complete, this table shows which algorithms are currently ava
 25.10.10 | std::transform_exclusive_scan | ✅ | ✅
 25.10.11 | std::transform_inclusive_scan | ✅ | ✅
 25.10.12 | std::adjacent_difference | ✅ | ✅
-25.11.3 | std::uninitialized_default_construct | ❌ | ❌
-| | std::uninitialized_default_construct_n | ❌ | ❌
-25.11.4 | std::uninitialized_value_construct | ❌ | ❌
-| | std::uninitialized_value_construct_n | ❌ | ❌
+25.11.3 | std::uninitialized_default_construct | ✅ | ✅
+| | std::uninitialized_default_construct_n | ✅ | ✅
+25.11.4 | std::uninitialized_value_construct | ✅ | ✅
+| | std::uninitialized_value_construct_n | ✅ | ✅
 25.11.5 | std::uninitialized_copy | ❌ | ❌
 | | std::uninitialized_copy_n | ❌ | ❌
 25.11.6 | std::uninitialized_move | ❌ | ❌
@@ -194,6 +194,7 @@ inclusive_scan                 0.52       0.62       0.93       2.26       2.24 
 transform_exclusive_scan       0.44       0.44       1.68       2.24       2.27       2.23 
 transform_inclusive_scan       0.39       0.57       1.77       2.27       2.29       2.32 
 adjacent_difference            0.21       0.75       0.49       0.91       0.79       0.78
+uninitialized_value_construct  0.44       0.27       0.92       0.98       1.70       2.27
 uninitialized_fill             0.63       1.52       3.37       4.02       4.07       3.50
 destroy                        0.25       0.64       1.51       1.61       1.67       1.92
 ```
