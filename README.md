@@ -198,3 +198,17 @@ uninitialized_value_construct  0.44       0.27       0.92       0.98       1.70 
 uninitialized_fill             0.63       1.52       3.37       4.02       4.07       3.50
 destroy                        0.25       0.64       1.51       1.61       1.67       1.92
 ```
+
+## Running benchmarks
+
+Run the following commands to execute the benchmarks locally:
+
+```Shell
+git clone https://github.com/mikekazakov/pstld.git && \
+  cd pstld && \
+  cd test-llvm-pstl && ./bootstrap.sh && cd - && \
+  cd test-msvc-stl && ./bootstrap.sh && cd - && \
+  cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release . && \
+  make benchmark &&
+  ./benchmark/benchmark
+```
