@@ -612,7 +612,7 @@ struct uninitialized_fill { // 25.11.7
                            std::uninitialized_fill(ExPo{},
                                                    (std::string *)mem.get(),
                                                    (std::string *)mem.get() + size,
-                                                   "Hello from a definitely non-SBO string!");
+                                                   "Small string");
                            noopt(mem);
                        },
                        [&] {

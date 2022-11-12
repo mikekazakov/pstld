@@ -197,7 +197,7 @@ adjacent_difference            0.21       0.75       0.49       0.91       0.79 
 uninitialized_value_construct  0.44       0.27       0.92       0.98       1.70       2.27
 uninitialized_copy             0.51       0.99       3.39       1.69       2.25       2.10
 uninitialized_move             0.54       0.47       1.16       1.22       1.65       1.79
-uninitialized_fill             0.63       1.52       3.37       4.02       4.07       3.50
+uninitialized_fill             0.68       1.55       4.57       4.93       4.73       4.91
 destroy                        0.25       0.64       1.51       1.61       1.67       1.92
 ```
 
