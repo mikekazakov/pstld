@@ -1,7 +1,7 @@
 ![Build Status](https://github.com/mikekazakov/pstld/actions/workflows/build.yml/badge.svg)
 
 # pstld
-Experimental implementation of ParallelSTL on top of Grand Central Dispatch aka libdispatch
+Experimental implementation of ParallelSTL on top of GCD aka libdispatch
 
 The purpose of this library is to provide a drop-in implementation of C++ parallel algorithms for the Apple platforms.
 Xcode comes with no parallel algorithms in libc++, so this library aims to fill the gap.
@@ -84,7 +84,7 @@ The library is not complete, this table shows which algorithms are currently ava
 25.7.1 | std::copy | ✅ | ✅
 | | std::copy_n | ✅ | ✅
 | | std::copy_if | ✅ | ❌
-25.7.2 | std::move | ✅ | ✅
+25.7.2 | std::move | ✅ | ❌
 25.7.3 | std::swap_ranges | ✅ | ✅
 25.7.4 | std::transform | ✅ | ✅
 25.7.5 | std::replace | ✅ | ✅
@@ -173,7 +173,6 @@ mismatch                       0.30       0.67       0.68       1.10       1.10 
 equal                          0.50       0.80       0.76       1.23       1.23       1.27 
 search                         0.50       0.83       1.61       4.22       4.39       4.78 
 copy                           0.29       0.74       0.37       0.73       0.96       1.87 
-move                           0.18       1.09       2.22       1.15       1.11       1.76
 swap_ranges                    0.35       0.75       0.70       0.80       0.99       1.69 
 transform                      0.14       0.84       0.44       0.76       0.84       2.30 
 replace                        0.12       0.31       0.32       0.85       1.05       1.83 

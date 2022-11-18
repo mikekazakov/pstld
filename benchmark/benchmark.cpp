@@ -209,24 +209,6 @@ struct copy { // 25.7.1
 };
 
 template <class ExPo>
-struct move { // 25.7.2
-    auto operator()(size_t size)
-    {
-        std::vector<std::string> v1;
-        std::vector<std::string> v2;
-        return measure(
-            [&] {
-                v1 = std::vector<std::string>(size, "Small string");
-                v2 = std::vector<std::string>(size);
-            },
-            [&] {
-                std::move(ExPo{}, v1.begin(), v1.end(), v2.begin());
-                noopt(v2);
-            });
-    }
-};
-
-template <class ExPo>
 struct swap_ranges { // 25.7.3
     auto operator()(size_t size)
     {
@@ -696,46 +678,45 @@ Result record()
 int main()
 {
     std::vector<Result> results;
-//    results.emplace_back(record<benchmarks::all_of>());
-//    results.emplace_back(record<benchmarks::any_of>());
-//    results.emplace_back(record<benchmarks::none_of>());
-//    results.emplace_back(record<benchmarks::for_each>());
-//    results.emplace_back(record<benchmarks::find>());
-//    results.emplace_back(record<benchmarks::find_end>());
-//    results.emplace_back(record<benchmarks::find_first_of>());
-//    results.emplace_back(record<benchmarks::adjacent_find>());
-//    results.emplace_back(record<benchmarks::count>());
-//    results.emplace_back(record<benchmarks::mismatch>());
-//    results.emplace_back(record<benchmarks::equal>());
-//    results.emplace_back(record<benchmarks::search>());
-//    results.emplace_back(record<benchmarks::copy>());
-    results.emplace_back(record<benchmarks::move>());
-//    results.emplace_back(record<benchmarks::swap_ranges>());
-//    results.emplace_back(record<benchmarks::transform>());
-//    results.emplace_back(record<benchmarks::replace>());
-//    results.emplace_back(record<benchmarks::fill>());
-//    results.emplace_back(record<benchmarks::reverse>());
-//    results.emplace_back(record<benchmarks::sort_Rnd>());
-//    results.emplace_back(record<benchmarks::sort_Eq>());
-//    results.emplace_back(record<benchmarks::sort_Asc>());
-//    results.emplace_back(record<benchmarks::sort_Des>());
-//    results.emplace_back(record<benchmarks::is_sorted>());
-//    results.emplace_back(record<benchmarks::is_partitioned>());
-//    results.emplace_back(record<benchmarks::merge>());
-//    results.emplace_back(record<benchmarks::minmax_element>());
-//    results.emplace_back(record<benchmarks::lexicographical_compare>());
-//    results.emplace_back(record<benchmarks::reduce>());
-//    results.emplace_back(record<benchmarks::transform_reduce>());
-//    results.emplace_back(record<benchmarks::exclusive_scan>());
-//    results.emplace_back(record<benchmarks::inclusive_scan>());
-//    results.emplace_back(record<benchmarks::transform_exclusive_scan>());
-//    results.emplace_back(record<benchmarks::transform_inclusive_scan>());
-//    results.emplace_back(record<benchmarks::adjacent_difference>());
-//    results.emplace_back(record<benchmarks::uninitialized_value_construct>());
-//    results.emplace_back(record<benchmarks::uninitialized_copy>());
-//    results.emplace_back(record<benchmarks::uninitialized_move>());
-//    results.emplace_back(record<benchmarks::uninitialized_fill>());
-//    results.emplace_back(record<benchmarks::destroy>());
+    results.emplace_back(record<benchmarks::all_of>());
+    results.emplace_back(record<benchmarks::any_of>());
+    results.emplace_back(record<benchmarks::none_of>());
+    results.emplace_back(record<benchmarks::for_each>());
+    results.emplace_back(record<benchmarks::find>());
+    results.emplace_back(record<benchmarks::find_end>());
+    results.emplace_back(record<benchmarks::find_first_of>());
+    results.emplace_back(record<benchmarks::adjacent_find>());
+    results.emplace_back(record<benchmarks::count>());
+    results.emplace_back(record<benchmarks::mismatch>());
+    results.emplace_back(record<benchmarks::equal>());
+    results.emplace_back(record<benchmarks::search>());
+    results.emplace_back(record<benchmarks::copy>());
+    results.emplace_back(record<benchmarks::swap_ranges>());
+    results.emplace_back(record<benchmarks::transform>());
+    results.emplace_back(record<benchmarks::replace>());
+    results.emplace_back(record<benchmarks::fill>());
+    results.emplace_back(record<benchmarks::reverse>());
+    results.emplace_back(record<benchmarks::sort_Rnd>());
+    results.emplace_back(record<benchmarks::sort_Eq>());
+    results.emplace_back(record<benchmarks::sort_Asc>());
+    results.emplace_back(record<benchmarks::sort_Des>());
+    results.emplace_back(record<benchmarks::is_sorted>());
+    results.emplace_back(record<benchmarks::is_partitioned>());
+    results.emplace_back(record<benchmarks::merge>());
+    results.emplace_back(record<benchmarks::minmax_element>());
+    results.emplace_back(record<benchmarks::lexicographical_compare>());
+    results.emplace_back(record<benchmarks::reduce>());
+    results.emplace_back(record<benchmarks::transform_reduce>());
+    results.emplace_back(record<benchmarks::exclusive_scan>());
+    results.emplace_back(record<benchmarks::inclusive_scan>());
+    results.emplace_back(record<benchmarks::transform_exclusive_scan>());
+    results.emplace_back(record<benchmarks::transform_inclusive_scan>());
+    results.emplace_back(record<benchmarks::adjacent_difference>());
+    results.emplace_back(record<benchmarks::uninitialized_value_construct>());
+    results.emplace_back(record<benchmarks::uninitialized_copy>());
+    results.emplace_back(record<benchmarks::uninitialized_move>());
+    results.emplace_back(record<benchmarks::uninitialized_fill>());
+    results.emplace_back(record<benchmarks::destroy>());
 
     const auto max_name_len =
         std::max_element(results.begin(), results.end(), [](auto &a, auto &b) {
