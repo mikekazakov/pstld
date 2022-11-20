@@ -3354,6 +3354,48 @@ FwdIt destroy_n(FwdIt first, Size count) noexcept
     return std::destroy_n(first, count);
 }
 
+//--------------------------------------------------------------------------------------------------
+// move
+//--------------------------------------------------------------------------------------------------
+
+namespace internal {
+
+template <class It1, class It2>
+struct Move : Dispatchable<Move<It1, It2>> {
+    Partition<It1> m_partition1;
+    Partition<It2> m_partition2;
+
+    Move(size_t count, size_t chunks, It1 first1, It2 first2)
+        : m_partition1(first1, count, chunks), m_partition2(first2, count, chunks)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        auto p1 = m_partition1.at(ind);
+        auto p2 = m_partition2.at(ind);
+        std::move(p1.first, p1.last, p2.first);
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt1, class FwdIt2>
+FwdIt2 move(FwdIt1 first1, FwdIt1 last1, FwdIt2 first2) noexcept
+{
+    const auto count = std::distance(first1, last1);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Move<FwdIt1, FwdIt2> op{static_cast<size_t>(count), chunks, first1, first2};
+            op.dispatch_apply(chunks);
+            return op.m_partition2.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::move(first1, last1, first2);
+}
+
 #if defined(PSTLD_INTERNAL_ARC)
 } // inline namespace arc
 #endif
@@ -3854,7 +3896,10 @@ template <class ExPo, class It1, class It2>
 execution::__enable_if_execution_policy<ExPo, It2>
 move(ExPo &&, It1 first, It1 last, It2 result) noexcept
 {
-    return ::std::move(first, last, result); // stub only
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::move(first, last, result);
+    else
+        return ::std::move(first, last, result);
 }
 
 // 25.7.3 - swap_ranges ////////////////////////////////////////////////////////////////////////////
