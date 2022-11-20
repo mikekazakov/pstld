@@ -16,18 +16,18 @@ jobs:
       run: |
         cd test-llvm-pstl && ./bootstrap.sh && cd -
         cd test-msvc-stl && ./bootstrap.sh
-    - name: Build and run unit tests (Release)
-      run: |
-        mkdir build-release
-        cd build-release
-        cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release ..
-        make -j all pstld-build-llvm-tests pstld-build-msvc-tests pstld-build-custom-tests
-        make test
     - name: Build and run unit tests (Debug)
       run: |
         mkdir build-debug
         cd build-debug
         cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Debug ..
+        make -j all pstld-build-llvm-tests pstld-build-msvc-tests pstld-build-custom-tests
+        make test
+    - name: Build and run unit tests (Release)
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release ..
         make -j all pstld-build-llvm-tests pstld-build-msvc-tests pstld-build-custom-tests
         make test
     - name: Build and run unit tests (ASAN)
