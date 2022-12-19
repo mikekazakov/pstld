@@ -12,7 +12,7 @@
 
 static constexpr size_t g_Iterations = 10;
 static constexpr size_t g_IterationsDiscard = 1;
-static constexpr size_t g_Sizes[] = {1000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
+static constexpr size_t g_Sizes[] = {1'000, 10'000, 100'000, 1'000'000, 10'000'000, 100'000'000};
 
 template <class Tp>
 inline void noopt(Tp const &value)
@@ -377,6 +377,25 @@ struct sort_Des { // 25.8.2.1, descending
 };
 
 template <class ExPo>
+struct stable_sort { // 25.8.2.2, semi-random input
+    auto operator()(size_t size)
+    {
+        std::vector<double> v;
+        return measure(
+            [&] {
+                std::mt19937 mt{42};
+                std::uniform_real_distribution<double> dist{0., 1.};
+                v = std::vector<double>(size);
+                std::generate(std::begin(v), std::end(v), [&dist, &mt] { return dist(mt); });
+            },
+            [&] {
+                std::stable_sort(ExPo{}, v.begin(), v.end());
+                noopt(v);
+            });
+    }
+};
+
+template <class ExPo>
 struct is_sorted { // 25.8.2.5
     auto operator()(size_t size)
     {
@@ -719,6 +738,7 @@ int main()
     results.emplace_back(record<benchmarks::sort_Eq>());
     results.emplace_back(record<benchmarks::sort_Asc>());
     results.emplace_back(record<benchmarks::sort_Des>());
+    results.emplace_back(record<benchmarks::stable_sort>());
     results.emplace_back(record<benchmarks::is_sorted>());
     results.emplace_back(record<benchmarks::is_partitioned>());
     results.emplace_back(record<benchmarks::merge>());
@@ -744,14 +764,17 @@ int main()
 
     printf("%*s", int(max_name_len + 1), "");
     for( auto s : g_Sizes ) {
-        printf("%10lu ", s);
+        if( s >= 1'000'000 )
+            printf("%4luM ", s / 1'000'000);
+        else if( s >= 1'000 )
+            printf("%4luK ", s / 1'000);
     }
     printf("\n");
 
     for( auto &r : results ) {
         printf("%-*s ", int(max_name_len), r.name.c_str());
         for( auto v : r.speedups )
-            printf("%10.2f ", v);
+            printf("%5.2f ", v);
         printf("\n");
     }
 }

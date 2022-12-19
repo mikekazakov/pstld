@@ -107,7 +107,7 @@ The library is not complete, this table shows which algorithms are currently ava
 25.7.14 | std::shift_left | ❌ | ❌
 | | std::shift_right | ❌ | ❌
 25.8.2.1 | std::sort | ✅ | ✅
-25.8.2.2 | std::stable_sort | ✅ | ❌
+25.8.2.2 | std::stable_sort | ✅ | ✅
 25.8.2.3 | std::partial_sort | ❌ | ❌
 25.8.2.4 | std::partial_sort_copy | ❌ | ❌
 25.8.2.5 | std::is_sorted | ✅ | ✅
@@ -156,50 +156,51 @@ The library is not complete, this table shows which algorithms are currently ava
 Each row shows how the parallel implementation compares to its serial counterpart depending on the number of elements in a working set.
 The serial variant executes the default algorithms from libc++ and the parallel one runs the pstld implementation.
 Per-element operations are mostly trivial in these benchmarks, so the speed-up numbers represent a somewhat worst-case scenario.
-The measurements were done on a M1 MacBook Pro (4P+4E cores CPU).
+The measurements were done on a M1 MacBook Pro (4P+4E cores CPU) running macOS 13.
 
 ```
-                               1000      10000     100000    1000000   10000000  100000000 
-all_of                         0.80       1.07       2.56       5.08       4.23       5.64 
-any_of                         0.47       0.72       0.86       1.90       2.29       3.56 
-none_of                        0.45       0.71       0.78       1.74       2.13       3.43 
-for_each                       0.22       0.76       0.43       0.75       0.97       1.90 
-find                           0.45       0.74       0.76       1.73       2.12       2.99 
-find_end                       0.12       0.15       0.23       0.67       0.73       1.19 
-find_first_of                  0.72       0.97       1.73       4.74       4.89       5.28 
-adjacent_find                  0.45       0.51       0.63       1.68       1.99       2.23 
-count                          0.07       0.37       0.47       0.71       0.93       2.34 
-mismatch                       0.30       0.67       0.68       1.10       1.10       1.51 
-equal                          0.50       0.80       0.76       1.23       1.23       1.27 
-search                         0.50       0.83       1.61       4.22       4.39       4.78 
-copy                           0.29       0.74       0.37       0.73       0.96       1.87 
-move                           0.18       1.09       2.22       1.15       1.11       1.76 
-swap_ranges                    0.35       0.75       0.70       0.80       0.99       1.69 
-transform                      0.14       0.84       0.44       0.76       0.84       2.30 
-replace                        0.12       0.31       0.32       0.85       1.05       1.83 
-fill                           0.06       0.31       0.44       0.71       0.74       1.32 
-reverse                        0.15       0.29       0.55       1.26       1.01       0.98 
-sort_Rnd                       0.14       1.73       3.05       3.71       4.32       4.28 
-sort_Eq                        0.08       0.39       0.67       0.90       0.98       1.01 
-sort_Asc                       0.09       0.10       0.33       0.41       0.43       0.38 
-sort_Des                       0.08       0.28       0.64       0.95       0.98       1.01 
-is_sorted                      0.19       0.55       0.66       1.57       2.04       2.99 
-is_partitioned                 0.31       0.62       0.80       1.61       2.14       3.17 
-merge                          0.99       0.50       0.75       1.36       1.96       2.02 
-minmax_element                 1.02       0.88       2.60       5.94       7.22       6.96 
-lexicographical_compare        0.69       1.28       1.47       2.15       2.11       2.21 
-reduce                         0.56       1.17       1.65       4.27       5.57       5.58 
-transform_reduce               0.86       1.29       1.41       4.33       5.24       5.52 
-exclusive_scan                 0.56       0.68       0.77       2.33       2.19       2.39 
-inclusive_scan                 0.52       0.62       0.93       2.26       2.24       2.44 
-transform_exclusive_scan       0.44       0.44       1.68       2.24       2.27       2.23 
-transform_inclusive_scan       0.39       0.57       1.77       2.27       2.29       2.32 
-adjacent_difference            0.21       0.75       0.49       0.91       0.79       0.78
-uninitialized_value_construct  0.44       0.27       0.92       0.98       1.70       2.27
-uninitialized_copy             0.51       0.99       3.39       1.69       2.25       2.10
-uninitialized_move             0.54       0.47       1.16       1.22       1.65       1.79
-uninitialized_fill             0.68       1.55       4.57       4.93       4.73       4.91
-destroy                        0.25       0.64       1.51       1.61       1.67       1.92
+                                 1K   10K  100K    1M   10M  100M 
+all_of                         0.14  0.34  1.37  2.70  2.38  2.64 
+any_of                         0.51  0.76  0.77  1.84  2.19  2.67 
+none_of                        0.52  0.71  0.74  1.84  2.10  2.56 
+for_each                       0.24  0.74  0.83  0.85  0.99  1.19 
+find                           0.21  0.72  0.76  1.76  2.14  2.57 
+find_end                       0.13  0.15  0.30  0.63  0.69  0.80 
+find_first_of                  0.37  0.96  1.97  4.68  5.34  5.41 
+adjacent_find                  0.43  0.47  0.54  1.67  2.01  2.22 
+count                          0.16  0.73  0.68  0.70  0.94  1.33 
+mismatch                       0.29  0.67  0.72  1.10  1.14  1.17 
+equal                          0.52  0.78  0.83  1.23  1.25  1.29 
+search                         0.53  0.69  1.39  2.95  3.43  3.46 
+copy                           0.29  0.79  0.39  0.77  0.97  1.43 
+move                           0.60  0.41  0.96  1.07  0.98  1.55 
+swap_ranges                    0.31  0.64  0.63  0.83  0.97  1.33 
+transform                      0.32  0.85  0.60  0.72  0.83  1.48 
+replace                        0.22  0.30  0.35  1.03  0.99  1.34 
+fill                           0.09  0.64  0.44  0.80  0.71  1.03 
+reverse                        0.27  0.81  0.57  1.34  1.02  0.98 
+sort_Rnd                       0.14  1.71  2.97  3.73  4.35  4.31 
+sort_Eq                        0.08  0.43  0.62  0.95  0.98  0.97 
+sort_Asc                       0.07  0.08  0.29  0.40  0.43  0.39 
+sort_Des                       0.38  0.32  0.64  0.94  0.98  0.97 
+stable_sort                    0.61  1.52  3.25  3.70  4.05  4.17 
+is_sorted                      0.30  0.41  0.79  1.89  2.10  2.73 
+is_partitioned                 0.33  0.45  0.92  1.91  2.10  2.74 
+merge                          1.00  0.31  0.82  1.28  1.29  1.74 
+minmax_element                 1.44  1.18  2.32  5.97  7.27  7.26 
+lexicographical_compare        0.64  0.62  1.31  2.14  2.11  2.20 
+reduce                         1.11  1.11  1.53  4.27  5.58  5.59 
+transform_reduce               1.08  1.55  1.45  4.28  5.63  5.67 
+exclusive_scan                 0.63  0.70  0.68  2.22  2.24  2.42 
+inclusive_scan                 0.69  0.50  0.82  2.32  2.24  2.44 
+transform_exclusive_scan       0.46  0.49  1.70  2.26  2.30  2.31 
+transform_inclusive_scan       0.40  0.40  1.70  2.27  2.33  2.34 
+adjacent_difference            0.29  0.82  0.49  0.76  0.79  0.78 
+uninitialized_value_construct  0.26  0.42  0.49  0.90  0.99  1.70 
+uninitialized_copy             0.59  0.66  1.74  1.38  1.44  2.08 
+uninitialized_move             0.40  0.40  1.08  1.24  1.17  1.70 
+uninitialized_fill             0.54  1.04  3.26  4.99  5.30  5.14 
+destroy                        0.17  0.67  1.47  1.61  1.60  1.69 
 ```
 
 ## Running the benchmarks
