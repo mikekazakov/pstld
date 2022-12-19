@@ -1,0 +1,42 @@
+diff --git a/tests/std/tests/P0024R2_parallel_algorithms_stable_sort/test.cpp b/tests/std/tests/P0024R2_parallel_algorithms_stable_sort/test.cpp
+index 2ffb607..48e6e8a 100644
+--- a/tests/std/tests/P0024R2_parallel_algorithms_stable_sort/test.cpp
++++ b/tests/std/tests/P0024R2_parallel_algorithms_stable_sort/test.cpp
+@@ -65,16 +65,16 @@ void assert_stable_sort_cmpTens_test_case(FwdIt first, FwdIt last) {
+     }
+ }
+ 
+-void test_case_stable_sort_parallel_list(const size_t testSize, mt19937& gen) {
+-    list<size_t> c;
+-    {
+-        const auto cVec = get_test_case_vector(testSize, gen);
+-        c.assign(cVec.begin(), cVec.end());
+-    }
+-
+-    stable_sort(par, c.begin(), c.end(), cmpTens);
+-    assert_stable_sort_cmpTens_test_case(c.begin(), c.end());
+-}
++//void test_case_stable_sort_parallel_list(const size_t testSize, mt19937& gen) {
++//    list<size_t> c;
++//    {
++//        const auto cVec = get_test_case_vector(testSize, gen);
++//        c.assign(cVec.begin(), cVec.end());
++//    }
++//
++//    stable_sort(par, c.begin(), c.end(), cmpTens);
++//    assert_stable_sort_cmpTens_test_case(c.begin(), c.end());
++//}
+ 
+ void test_case_stable_sort_parallel_vector(const size_t testSize, mt19937& gen) {
+     auto c = get_test_case_vector(testSize, gen);
+@@ -85,8 +85,8 @@ void test_case_stable_sort_parallel_vector(const size_t testSize, mt19937& gen)
+ int main() {
+     mt19937 gen(1729);
+ 
+-    test_case_stable_sort_parallel_special_cases<list>();
++//    test_case_stable_sort_parallel_special_cases<list>();
+     test_case_stable_sort_parallel_special_cases<vector>();
+-    parallel_test_case(test_case_stable_sort_parallel_list, gen);
++//    parallel_test_case(test_case_stable_sort_parallel_list, gen);
+     parallel_test_case(test_case_stable_sort_parallel_vector, gen);
+ }

@@ -34,7 +34,7 @@ set(UNIT_TESTS
 #   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_set_difference/test.cpp
 #   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_set_intersection/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_sort/test.cpp
-#   ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_stable_sort/test.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_stable_sort/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_transform/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_transform_exclusive_scan/test.cpp
     ${CMAKE_CURRENT_LIST_DIR}/STL/tests/std/tests/P0024R2_parallel_algorithms_transform_inclusive_scan/test.cpp
