@@ -2079,7 +2079,7 @@ std::pair<It, It> partition(It first, It last, Pred pred)
     }
 }
 
-inline size_t log2(size_t n) noexcept
+inline constexpr size_t log2(size_t n) noexcept
 {
     size_t log2n = 0;
     while( n > 1 ) {
@@ -2247,6 +2247,166 @@ template <class RanIt>
 void sort(RanIt first, RanIt last) noexcept
 {
     return ::pstld::sort(first, last, std::less<>{});
+}
+
+//--------------------------------------------------------------------------------------------------
+// stable_sort
+//--------------------------------------------------------------------------------------------------
+
+namespace internal {
+
+inline size_t stable_sort_tree_height(size_t elems) noexcept
+{
+    size_t chunks_elems = elems / insertion_sort_limit;
+    size_t log2_elems = log2(chunks_elems);
+
+    size_t chunks_oversubscr = max_hw_threads() * chunks_per_cpu;
+    size_t log2_oversubscr = log2(chunks_oversubscr);
+
+    return std::min(log2_elems, log2_oversubscr) & ~size_t(1);
+}
+
+template <class It1, class It2, class Cmp>
+void merge_mid_move(It1 first, It1 mid, It1 last, It2 out, Cmp cmp)
+{
+    // TODO: should it move-construct in-place instead of moving into?
+    auto first1 = first;
+    auto first2 = mid;
+    for( ; first1 != mid; ++out ) {
+        if( first2 == last ) {
+            std::move(first1, mid, out);
+            return;
+        }
+        if( cmp(*first2, *first1) ) {
+            *out = std::move(*first2);
+            ++first2;
+        }
+        else {
+            *out = std::move(*first1);
+            ++first1;
+        }
+    }
+    std::move(first2, last, out);
+}
+
+template <class It, class Cmp>
+struct StableSort {
+    struct Work {
+        size_t first;
+        size_t last;
+        size_t depth;
+    };
+
+    It m_first;
+    It m_last;
+    Cmp m_cmp;
+    size_t m_size;
+    size_t m_height;
+    size_t m_chunks;
+    size_t m_workers{max_hw_threads()};
+    std::atomic<size_t> m_next_chunk{0};
+
+    Partition<It> m_partition;
+    parallelism_vector<iterator_value_t<It>> m_buf; // TODO: should be raw temp memory instead?
+    parallelism_vector<std::atomic<bool>> m_flags;
+
+    DispatchGroup m_dg;
+
+    StableSort(It first, It last, Cmp cmp)
+        : m_first(first), m_last(last), m_cmp(cmp), m_size(last - first),
+          m_height(stable_sort_tree_height(m_size)), m_chunks(size_t(1) << m_height),
+          m_partition(first, m_size, m_chunks), m_buf(m_size), m_flags(size_t(1) << m_height)
+    {
+    }
+
+    void start() noexcept
+    {
+        for( size_t i = 1; i != m_workers; ++i )
+            m_dg.dispatch(static_cast<void *>(this), dispatch);
+        dispatch_worker();
+        m_dg.wait();
+    }
+
+    static void dispatch(void *ctx) noexcept
+    {
+        auto me = static_cast<StableSort *>(ctx);
+        me->dispatch_worker();
+    }
+
+    void dispatch_worker() noexcept
+    {
+        while( true ) {
+            size_t chunk = m_next_chunk.fetch_add(1);
+            if( chunk >= m_chunks )
+                break;
+            bottomup(chunk);
+        }
+    }
+
+    void bottomup(size_t ind) noexcept
+    {
+        auto p = m_partition.at(ind);
+
+        // TODO: need a custom implementation with an external buffer
+        ::std::stable_sort(p.first, p.last, m_cmp);
+
+        std::atomic<bool> *flag_ptr = m_flags.data();
+        if( !flag_ptr[ind / 2].exchange(true) ) // try to give up merging
+            return;
+
+        auto buf = m_buf.data();
+        for( size_t lvl = 1, chunks = m_chunks / 2;; ++lvl, chunks >>= 1 ) {
+            bool odd = ind & 1;
+            ind >>= 1;
+
+            auto first = odd ? m_partition.at(ind << lvl).first : p.first;
+            auto mid = odd ? p.first : p.last;
+            auto last = odd ? p.last : m_partition.at(((ind + 1) << lvl) - 1).last;
+
+            if( lvl % 2 ) {
+                // merge into tmp buf
+                merge_mid_move(first, mid, last, buf + (first - m_first), m_cmp);
+            }
+            else {
+                // merge back into orig buffer
+                merge_mid_move(buf + (first - m_first),
+                               buf + (mid - m_first),
+                               buf + (last - m_first),
+                               first,
+                               m_cmp);
+            }
+
+            flag_ptr += chunks;
+            if( !flag_ptr[ind / 2].exchange(true) ) // try to give up merging
+                return;
+
+            p.first = first;
+            p.last = last;
+        }
+    }
+};
+
+} // namespace internal
+
+template <class RanIt, class Cmp>
+void stable_sort(RanIt first, RanIt last, Cmp cmp) noexcept
+{
+    const auto count = std::distance(first, last);
+    if( static_cast<size_t>(count) > internal::insertion_sort_limit * 4 ) {
+        try {
+            internal::StableSort<RanIt, Cmp> op(first, last, cmp);
+            op.start();
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    std::stable_sort(first, last, cmp);
+}
+
+template <class RanIt>
+void stable_sort(RanIt first, RanIt last) noexcept
+{
+    return ::pstld::stable_sort(first, last, std::less<>{});
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -4029,18 +4189,18 @@ template <class ExPo, class It>
 execution::__enable_if_execution_policy<ExPo, void> sort(ExPo &&, It first, It last)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::sort(first, last);
+        ::pstld::sort(first, last);
     else
-        return ::std::sort(first, last);
+        ::std::sort(first, last);
 }
 
 template <class ExPo, class It, class Cmp>
 execution::__enable_if_execution_policy<ExPo, void> sort(ExPo &&, It first, It last, Cmp cmp)
 {
     if constexpr( execution::__pstld_enabled<ExPo> )
-        return ::pstld::sort(first, last, cmp);
+        ::pstld::sort(first, last, cmp);
     else
-        return ::std::sort(first, last, cmp);
+        ::std::sort(first, last, cmp);
 }
 
 // 25.8.2.2 - stable_sort //////////////////////////////////////////////////////////////////////////
@@ -4048,15 +4208,19 @@ execution::__enable_if_execution_policy<ExPo, void> sort(ExPo &&, It first, It l
 template <class ExPo, class It>
 execution::__enable_if_execution_policy<ExPo, void> stable_sort(ExPo &&, It first, It last)
 {
-    // stub for now
-    return ::std::stable_sort(first, last);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::stable_sort(first, last);
+    else
+        ::std::stable_sort(first, last);
 }
 
 template <class ExPo, class It, class Cmp>
 execution::__enable_if_execution_policy<ExPo, void> stable_sort(ExPo &&, It first, It last, Cmp cmp)
 {
-    // stub for now
-    return ::std::stable_sort(first, last, cmp);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::stable_sort(first, last, cmp);
+    else
+        ::std::stable_sort(first, last, cmp);
 }
 
 // 25.8.2.5 - is_sorted, is_sorted_until ///////////////////////////////////////////////////////////
