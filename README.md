@@ -256,6 +256,55 @@ destroy                        0.42  1.25  2.49  2.72  2.76  2.86
 </details>
 
 <details>
+  <summary>2012 MacBook Pro 13" (Intel 3520M CPU, 2 cores), macOS 10.15, Xcode 12</summary>
+
+```
+                                 1K   10K  100K    1M   10M  100M 
+all_of                         0.32  0.47  1.28  1.23  1.83  2.04 
+any_of                         0.43  1.01  1.70  1.96  2.46  2.47 
+none_of                        0.09  0.71  1.69  1.99  2.58  3.29 
+for_each                       0.18  0.41  1.46  1.34  1.31  1.44 
+find                           0.31  0.34  1.37  1.58  2.81  3.14 
+find_end                       0.17  0.29  0.39  0.55  0.57  0.67 
+find_first_of                  0.60  1.01  0.87  2.48  3.53  3.53 
+adjacent_find                  0.06  1.45  0.93  1.53  2.68  3.47 
+count                          0.02  0.27  1.16  1.27  1.53  1.80 
+mismatch                       0.42  0.78  1.65  1.83  1.67  2.21 
+equal                          0.34  0.63  2.38  1.81  2.30  2.46 
+search                         0.83  0.68  1.67  2.55  3.60  3.63 
+copy                           0.42  0.91  1.05  1.26  1.21  1.42 
+move                           0.66  0.84  1.31  1.21  1.27  1.46 
+swap_ranges                    0.38  0.70  0.79  1.23  1.25  1.40 
+transform                      0.03  0.27  1.11  1.28  1.35  1.71 
+replace                        0.59  0.82  0.59  1.42  1.85  1.76 
+fill                           0.41  0.77  0.95  1.05  1.28  1.40 
+reverse                        0.43  0.62  1.81  1.42  1.32  1.22 
+sort_Rnd                       0.04  0.06  0.23  0.97  1.57  1.63 
+sort_Eq                        0.11  0.02  0.07  0.45  1.46  1.91 
+sort_Asc                       0.06  0.24  0.21  0.20  0.16  0.13 
+sort_Des                       0.09  0.49  1.44  1.77  1.55  1.90 
+stable_sort                    0.65  1.88  1.64  1.90  1.72  1.71 
+is_sorted                      0.32  0.53  1.01  1.25  1.93  1.95 
+is_partitioned                 0.25  0.47  1.14  1.21  1.64  1.93 
+merge                          0.99  0.56  1.24  1.08  1.07  1.18 
+minmax_element                 0.28  0.56  0.98  1.54  1.77  1.95 
+lexicographical_compare        0.79  0.80  1.16  1.51  1.62  1.64 
+reduce                         0.59  0.70  1.47  1.49  2.14  2.47 
+transform_reduce               0.61  0.49  1.85  1.56  2.13  2.43 
+exclusive_scan                 0.28  0.37  1.28  0.84  0.96  1.03 
+inclusive_scan                 0.07  0.38  0.79  0.76  0.91  1.02 
+transform_exclusive_scan       0.56  0.85  0.91  0.99  1.14  1.13 
+transform_inclusive_scan       0.50  0.92  1.03  1.12  1.12  1.16 
+adjacent_difference            0.03  0.14  1.67  0.97  1.04  1.05 
+uninitialized_value_construct  0.03  0.46  0.66  0.82  0.80  1.03 
+uninitialized_copy             0.60  0.74  1.70  1.60  1.68  1.89 
+uninitialized_move             0.19  1.22  1.30  1.07  1.19  1.29 
+uninitialized_fill             0.52  1.47  2.11  2.12  2.48  2.48 
+destroy                        0.23  0.25  0.31  0.48  0.55  0.73 
+```
+</details>
+
+<details>
   <summary>iPhone 11 Pro (Apple A13 CPU, 2P+4E cores), iOS 16, Xcode 14</summary>
 
 ```
