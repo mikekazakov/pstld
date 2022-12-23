@@ -2290,6 +2290,82 @@ void merge_mid_move(It1 first, It1 mid, It1 last, It2 out, Cmp cmp)
 }
 
 template <class It, class Cmp>
+void insertion_sort_buf_assign_move(It first, It last, Cmp cmp, iterator_value_t<It> *buf)
+{
+    if( first == last )
+        return;
+
+    auto last2 = buf;
+    *(last2++) = std::move(*first);
+
+    for( ; ++first != last; ++last2 ) {
+        auto j2 = last2;
+        auto i2 = j2;
+        if( cmp(*first, *--i2) ) {
+            *j2 = std::move(*i2);
+            for( --j2; i2 != buf && cmp(*first, *--i2); --j2 )
+                *j2 = std::move(*i2);
+            *j2 = std::move(*first);
+        }
+        else {
+            *j2 = std::move(*first);
+        }
+    }
+}
+
+template <class It, class Cmp>
+void stable_sort(It first, It last, Cmp cmp, iterator_value_t<It> *buf);
+
+template <class It, class Cmp>
+void stable_sort_buf_assign_move(It first, It last, Cmp cmp, iterator_value_t<It> *buf)
+{
+    size_t len = last - first;
+    if( len == 0 ) {
+    }
+    else if( len == 1 ) {
+        *buf = std::move(*first);
+    }
+    else if( len == 2 ) {
+        auto second = first;
+        ++second;
+        if( cmp(*second, *first) ) {
+            *(buf++) = std::move(*second);
+            *buf = std::move(*first);
+        }
+        else {
+            *(buf++) = std::move(*first);
+            *buf = std::move(*second);
+        }
+    }
+    else if( len <= insertion_sort_limit ) {
+        insertion_sort_buf_assign_move(first, last, cmp, buf);
+    }
+    else {
+        size_t half = len / 2;
+        It mid = first + half;
+        stable_sort(first, mid, cmp, buf);
+        stable_sort(mid, last, cmp, buf + half);
+        merge_mid_move(first, mid, last, buf, cmp);
+    }
+}
+
+template <class It, class Cmp>
+void stable_sort(It first, It last, Cmp cmp, iterator_value_t<It> *buf)
+{
+    size_t len = last - first;
+    if( len <= insertion_sort_limit ) {
+        insertion_sort(first, last, cmp);
+    }
+    else {
+        size_t half = len / 2;
+        It mid = first + half;
+        stable_sort_buf_assign_move(first, mid, cmp, buf);
+        stable_sort_buf_assign_move(mid, last, cmp, buf + half);
+        merge_mid_move(buf, buf + half, buf + len, first, cmp);
+    }
+}
+
+template <class It, class Cmp>
 struct StableSort {
     struct Work {
         size_t first;
@@ -2347,9 +2423,7 @@ struct StableSort {
     {
         auto p = m_partition.at(ind);
 
-        // TODO: need a custom implementation with an external buffer
-        ::std::stable_sort(p.first, p.last, m_cmp);
-
+        stable_sort(p.first, p.last, m_cmp, m_buf.data() + std::distance(m_first, p.first));
         std::atomic<bool> *flag_ptr = m_flags.data();
         if( !flag_ptr[ind / 2].exchange(true) ) // try to give up merging
             return;
