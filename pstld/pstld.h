@@ -2706,6 +2706,7 @@ void fill(FwdIt first, FwdIt last, const T &val) noexcept
     }
     return std::fill(first, last, val);
 }
+
 template <class FwdIt, class Size, class T>
 FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
 {
@@ -2722,6 +2723,69 @@ FwdIt fill_n(FwdIt first, Size count, const T &val) noexcept
         }
     }
     return std::fill_n(first, count, val);
+}
+
+//--------------------------------------------------------------------------------------------------
+// generate, generate_n
+//--------------------------------------------------------------------------------------------------
+
+namespace internal {
+
+template <class It, class Gen>
+struct Generate : Dispatchable<Generate<It, Gen>> {
+    Partition<It> m_partition;
+    Gen &m_gen;
+
+    Generate(size_t count, size_t chunks, It first, Gen &gen)
+        : m_partition(first, count, chunks), m_gen(gen)
+    {
+    }
+
+    void run(size_t ind) noexcept
+    {
+        // this technically violates the assumption that the generation will be performed in a
+        // deterministic order, but that in turn essentially makes a parallel version
+        // unimplementable. so instead this implementation calls the generator concurrently without
+        // a specific order.
+        for( auto p = m_partition.at(ind); p.first != p.last; ++p.first )
+            *p.first = m_gen();
+    }
+};
+
+} // namespace internal
+
+template <class FwdIt, class Gen>
+void generate(FwdIt first, FwdIt last, Gen gen) noexcept
+{
+    const auto count = std::distance(first, last);
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Generate<FwdIt, Gen> op{static_cast<size_t>(count), chunks, first, gen};
+            op.dispatch_apply(chunks);
+            return;
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::generate(first, last, gen);
+}
+
+template <class FwdIt, class Size, class Gen>
+FwdIt generate_n(FwdIt first, Size count, Gen gen) noexcept
+{
+    if( count < 1 )
+        return first;
+
+    const auto chunks = internal::work_chunks_min_fraction_1(count);
+    if( chunks > 1 ) {
+        try {
+            internal::Generate<FwdIt, Gen> op{static_cast<size_t>(count), chunks, first, gen};
+            op.dispatch_apply(chunks);
+            return op.m_partition.end();
+        } catch( const internal::parallelism_exception & ) {
+        }
+    }
+    return std::generate_n(first, count, gen);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -4235,15 +4299,19 @@ fill_n(ExPo &&, It first, Size count, const T &value) noexcept
 template <class ExPo, class It, class Gen>
 execution::__enable_if_execution_policy<ExPo, void> generate(ExPo &&, It first, It last, Gen gen)
 {
-    // stub only
-    ::std::generate(first, last, gen);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        ::pstld::generate(first, last, gen);
+    else
+        ::std::generate(first, last, gen);
 }
 
 template <class ExPo, class It, class Size, class Gen>
 execution::__enable_if_execution_policy<ExPo, It> generate_n(ExPo &&, It first, Size count, Gen gen)
 {
-    // stub only
-    return ::std::generate_n(first, count, gen);
+    if constexpr( execution::__pstld_enabled<ExPo> )
+        return ::pstld::generate_n(first, count, gen);
+    else
+        return ::std::generate_n(first, count, gen);
 }
 
 // 25.7.10 - reverse ///////////////////////////////////////////////////////////////////////////////

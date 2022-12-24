@@ -93,8 +93,8 @@ The library is not complete, this table shows which algorithms are currently ava
 | | std::replace_copy_if | ✅ | ❌
 25.7.6 | std::fill | ✅ | ✅
 | | std::fill_n | ✅ | ✅
-25.7.7 | std::generate | ✅ | ❌
-| | std::generate_n | ✅ | ❌
+25.7.7 | std::generate | ✅ | ✅
+| | std::generate_n | ✅ | ✅
 25.7.8 | std::remove | ❌ | ❌
 | | std::remove_if | ❌ | ❌
 | | std::remove_copy | ❌ | ❌
