@@ -9,6 +9,7 @@ add_custom_target(check-pstld-custom
     COMMENT "Build and run all the unit tests.")
 set_target_properties(check-pstld-custom PROPERTIES FOLDER "Tests/Custom")
 
+add_subdirectory(defines_feature_test_macros)
 add_subdirectory(linked_objcpp_arc)
 add_subdirectory(linked_objcpp_noarc)
 add_subdirectory(linked_mixed)

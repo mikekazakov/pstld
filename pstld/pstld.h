@@ -3798,6 +3798,14 @@ PSTLD_INTERNAL_IMPL void parallelism_exception::raise()
 
 #if defined(PSTLD_INTERNAL_DO_HACK_INTO_STD)
 
+#ifndef __cpp_lib_execution
+#define __cpp_lib_execution 201902L
+#endif
+
+#ifndef __cpp_lib_parallel_algorithm
+#define __cpp_lib_parallel_algorithm 201603L
+#endif
+
 namespace std {
 
 namespace execution {
