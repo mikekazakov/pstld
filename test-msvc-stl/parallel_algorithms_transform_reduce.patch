@@ -1,0 +1,22 @@
+diff --git a/tests/std/tests/P0024R2_parallel_algorithms_transform_reduce/test.cpp b/tests/std/tests/P0024R2_parallel_algorithms_transform_reduce/test.cpp
+index 9141838..096dd68 100644
+--- a/tests/std/tests/P0024R2_parallel_algorithms_transform_reduce/test.cpp
++++ b/tests/std/tests/P0024R2_parallel_algorithms_transform_reduce/test.cpp
+@@ -88,7 +88,7 @@ void test_case_move_only_binary(ExPo&& exec, const size_t testSize) {
+     auto testData1                          = get_move_only_test_data(testSize);
+     auto testData2                          = get_move_only_test_data(testSize);
+     unique_ptr<vector<unsigned int>> result = transform_reduce(
+-        forward<ExPo>(exec), make_move_iterator(testData1.begin()), make_move_iterator(testData1.end()),
++        std::forward<ExPo>(exec), make_move_iterator(testData1.begin()), make_move_iterator(testData1.end()),
+         make_move_iterator(testData2.begin()), make_unique<vector<unsigned int>>(),
+         [](unique_ptr<vector<unsigned int>> lhs, unique_ptr<vector<unsigned int>> rhs) {
+             lhs->insert(lhs->end(), rhs->begin(), rhs->end());
+@@ -114,7 +114,7 @@ template <class ExPo>
+ void test_case_move_only(ExPo&& exec, const size_t testSize) {
+     auto testData                           = get_move_only_test_data(testSize);
+     unique_ptr<vector<unsigned int>> result = transform_reduce(
+-        forward<ExPo>(exec), make_move_iterator(testData.begin()), make_move_iterator(testData.end()),
++        std::forward<ExPo>(exec), make_move_iterator(testData.begin()), make_move_iterator(testData.end()),
+         make_unique<vector<unsigned int>>(),
+         [](unique_ptr<vector<unsigned int>> lhs, unique_ptr<vector<unsigned int>> rhs) {
+             lhs->insert(lhs->end(), rhs->begin(), rhs->end());

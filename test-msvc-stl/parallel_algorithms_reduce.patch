@@ -1,0 +1,13 @@
+diff --git a/tests/std/tests/P0024R2_parallel_algorithms_reduce/test.cpp b/tests/std/tests/P0024R2_parallel_algorithms_reduce/test.cpp
+index c168a29..1cf70e4 100644
+--- a/tests/std/tests/P0024R2_parallel_algorithms_reduce/test.cpp
++++ b/tests/std/tests/P0024R2_parallel_algorithms_reduce/test.cpp
+@@ -55,7 +55,7 @@ void test_case_move_only(ExPo&& exec, const size_t testSize) {
+     // algorithms, but the standard is unclear here and if this isn't allowed, the standard
+     // is bad and should feel bad
+     auto testData                           = get_move_only_test_data(testSize);
+-    unique_ptr<vector<unsigned int>> result = reduce(forward<ExPo>(exec), make_move_iterator(testData.begin()),
++    unique_ptr<vector<unsigned int>> result = reduce(std::forward<ExPo>(exec), make_move_iterator(testData.begin()),
+         make_move_iterator(testData.end()), make_unique<vector<unsigned int>>(),
+         [](unique_ptr<vector<unsigned int>> lhs, unique_ptr<vector<unsigned int>> rhs) {
+             lhs->insert(lhs->end(), rhs->begin(), rhs->end());
