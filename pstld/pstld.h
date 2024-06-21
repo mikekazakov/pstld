@@ -26,12 +26,6 @@
 
 #if defined(PSTLD_INTERNAL_HEADER_ONLY)
     #include <dispatch/dispatch.h>
-#else
-    #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400
-        #define DISPATCH_APPLY_AUTO_AVAILABLE 1
-    #else
-        #define DISPATCH_APPLY_AUTO_AVAILABLE 0
-    #endif
 #endif
 
 #include <algorithm>
